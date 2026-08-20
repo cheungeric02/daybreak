@@ -610,7 +610,7 @@ async function gcalFetchToday(){
       if(el){
         let msg="Calendar error ("+r.status+").";
         if(r.status===403){
-          if(/accessNotConfigured|SERVICE_DISABLED/i.test(reason+detail)) msg="Calendar API isn't enabled on your Google Cloud project. Enable “Google Calendar API”, then reconnect.";
+          if(/accessNotConfigured|SERVICE_DISABLED/i.test(reason+detail)){ const pm=(detail.match(/project[s]?\s+"?(\d{5,})"?/i)||[])[1]; msg="Calendar API isn't enabled in the project that owns your Client ID"+(pm?(" (project "+pm+")"):"")+". Enable “Google Calendar API” in THAT project, then reconnect."; }
           else if(/insufficient|scope|ACCESS_TOKEN_SCOPE/i.test(reason+detail)) msg="Access wasn't granted for calendar. Disconnect, reconnect, and tick the calendar permission.";
           else if(/rateLimitExceeded|quota/i.test(reason)) msg="Google rate-limited the request — try again shortly.";
           else msg="Calendar access denied (403). Add yourself as a Test user on the OAuth consent screen, then reconnect.";

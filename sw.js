@@ -1,6 +1,6 @@
 /* Daybreak service worker — offline app shell.
    Bump CACHE when index.html changes so clients pull the new build. */
-const CACHE = "daybreak-v4";
+const CACHE = "daybreak-v5";
 const CORE = ["./", "./index.html", "./manifest.webmanifest", "./icon.svg"];
 
 self.addEventListener("install", e => {
