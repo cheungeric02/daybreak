@@ -417,6 +417,13 @@
       <p class="synchint" id="syncStatus">Off — your list is saved on this device only.</p>
       <p class="synchint dim">This key is also your <b>recovery key</b>: enter the same one on a new phone (or after clearing data) to restore everything. Keep it private — anyone with it can see your list.</p>
     </div>
+    <div class="field">
+      <label>Google Calendar (today's events in your Brief)</label>
+      <input type="text" id="setGcalClient" placeholder="OAuth Client ID (…apps.googleusercontent.com)" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <button class="ghostbtn" id="btnGcal" style="margin-top:9px;width:100%">Connect Google Calendar</button>
+      <p class="synchint" id="gcalStatus">Off — showing sample events.</p>
+      <p class="synchint dim">Read-only. Paste the OAuth <b>Client ID</b> from your Google Cloud project, then tap Connect. One-time setup steps are in the app’s README.</p>
+    </div>
     <button class="ghostbtn" id="reseed">↺ Reload sample data</button>
     <button class="dangerbtn" id="wipe">Clear everything</button>
     <p class="qhint" style="text-align:center;margin-top:18px">Daybreak · saved on this device · cloud backup optional</p>
@@ -466,7 +473,7 @@ let activeFilter="week";    // date filter: all|today|tomorrow|week|month
 function seed(){
   const tk=dayKey();
   return {
-    settings:{name:"Eric",wkday:"06:45",wkend:"08:00",night:"23:00",theme:"auto",tab:"personal",filter:"week",syncKey:""},
+    settings:{name:"Eric",wkday:"06:45",wkend:"08:00",night:"23:00",theme:"auto",tab:"personal",filter:"week",syncKey:"",gcalClient:""},
     updatedAt:0,   // 0 = never edited by a person; keeps a fresh seed from ever overwriting the cloud backup
     bring:[{id:uid(),label:"Laptop",done:false},{id:uid(),label:"Gym bag",done:false},
            {id:uid(),label:"Meds",done:false},{id:uid(),label:"Umbrella",done:false}],
@@ -528,6 +535,87 @@ window.__dbCloudStatus=(msg,state)=>{
   const el=document.getElementById("syncStatus");
   if(el){el.textContent=msg;el.dataset.state=state||"";}
 };
+
+/* ============================================================
+   GOOGLE CALENDAR (read-only) — today's events feed the Brief.
+   Uses Google Identity Services token flow. The OAuth Client ID
+   is public and lives in settings; the access token stays in
+   memory + a local (non-synced) key, never in the cloud blob.
+   ============================================================ */
+let liveCal=null;                 // today's real events, or null until fetched
+let gcalToken=null, gcalExp=0;    // access token + expiry (ms epoch)
+let gcalTokenClient=null;
+const GCAL_TOK_LS="daybreak_gcal_tok";
+function gcalClientId(){ return ((S.settings&&S.settings.gcalClient)||"").trim(); }
+function gcalConfigured(){ return !!gcalClientId(); }
+function gcalConnected(){ return gcalConfigured() && !!gcalToken && Date.now()<gcalExp; }
+function calEvents(){ return gcalConfigured() ? (liveCal||[]) : S.calendar; }
+function fmtClock(d){ let h=d.getHours(),m=d.getMinutes(); const ap=h>=12?"PM":"AM"; h=h%12||12; return h+(m?":"+String(m).padStart(2,"0"):"")+" "+ap; }
+function refreshGcalStatus(){
+  const btn=$("#btnGcal"); if(btn)btn.textContent=gcalConnected()?"Disconnect":"Connect Google Calendar";
+  const el=$("#gcalStatus"); if(!el)return;
+  if(gcalConnected()){ el.textContent="Connected ✓"+(liveCal?" · "+liveCal.length+" event"+(liveCal.length!==1?"s":"")+" today":""); el.dataset.state="on"; }
+  else if(gcalConfigured()){ el.textContent="Ready — tap Connect."; el.dataset.state=""; }
+  else { el.textContent="Off — showing sample events."; el.dataset.state=""; }
+}
+function loadGis(){ return new Promise((res,rej)=>{
+  if(window.google&&google.accounts&&google.accounts.oauth2)return res();
+  const s=document.createElement("script"); s.src="https://accounts.google.com/gsi/client"; s.async=true; s.defer=true;
+  s.onload=()=>res(); s.onerror=()=>rej(new Error("gsi")); document.head.appendChild(s);
+});}
+async function gcalConnect(){
+  if(!gcalConfigured()){ const el=$("#gcalStatus"); if(el){el.textContent="Paste your OAuth Client ID first.";el.dataset.state="err";} return; }
+  try{
+    await loadGis();
+    if(!gcalTokenClient){
+      gcalTokenClient=google.accounts.oauth2.initTokenClient({
+        client_id:gcalClientId(),
+        scope:"https://www.googleapis.com/auth/calendar.readonly",
+        callback:resp=>{
+          if(resp&&resp.access_token){
+            gcalToken=resp.access_token;
+            gcalExp=Date.now()+((resp.expires_in||3600)*1000)-60000;
+            try{localStorage.setItem(GCAL_TOK_LS,JSON.stringify({token:gcalToken,exp:gcalExp}));}catch(e){}
+            gcalFetchToday();
+          }else{ const el=$("#gcalStatus"); if(el){el.textContent="Couldn't get access — try again.";el.dataset.state="err";} }
+        }
+      });
+    }
+    const el=$("#gcalStatus"); if(el){el.textContent="Opening Google sign-in…";el.dataset.state="";}
+    gcalTokenClient.requestAccessToken({prompt: gcalToken?"":"consent"});
+  }catch(e){ const el=$("#gcalStatus"); if(el){el.textContent="Google sign-in couldn't start here.";el.dataset.state="err";} }
+}
+function gcalDisconnect(){
+  try{ if(gcalToken&&window.google&&google.accounts&&google.accounts.oauth2) google.accounts.oauth2.revoke(gcalToken,()=>{}); }catch(e){}
+  gcalToken=null; gcalExp=0; liveCal=null;
+  try{localStorage.removeItem(GCAL_TOK_LS);}catch(e){}
+  refreshGcalStatus();
+  if($("#v-brief")&&$("#v-brief").classList.contains("active"))renderBrief();
+}
+async function gcalFetchToday(){
+  if(!gcalConnected())return;
+  const now=new Date();
+  const start=new Date(now.getFullYear(),now.getMonth(),now.getDate(),0,0,0);
+  const end=new Date(now.getFullYear(),now.getMonth(),now.getDate(),23,59,59);
+  const url="https://www.googleapis.com/calendar/v3/calendars/primary/events?"+
+    "timeMin="+encodeURIComponent(start.toISOString())+"&timeMax="+encodeURIComponent(end.toISOString())+
+    "&singleEvents=true&orderBy=startTime&maxResults=25";
+  try{
+    const r=await fetch(url,{headers:{Authorization:"Bearer "+gcalToken}});
+    if(r.status===401){ gcalToken=null; gcalExp=0; try{localStorage.removeItem(GCAL_TOK_LS);}catch(e){} refreshGcalStatus(); return; }
+    if(!r.ok){ const el=$("#gcalStatus"); if(el){el.textContent="Calendar error ("+r.status+").";el.dataset.state="err";} return; }
+    const data=await r.json();
+    liveCal=(data.items||[]).map(ev=>({
+      id:ev.id,
+      title:ev.summary||"(untitled event)",
+      time: ev.start&&ev.start.dateTime ? fmtClock(new Date(ev.start.dateTime)) : "All day",
+      list:"personal"
+    }));
+    refreshGcalStatus();
+    if($("#v-brief")&&$("#v-brief").classList.contains("active"))renderBrief();
+  }catch(e){ const el=$("#gcalStatus"); if(el){el.textContent="Couldn't reach Google Calendar.";el.dataset.state="err";} }
+}
+function gcalRestore(){ try{ const t=JSON.parse(localStorage.getItem(GCAL_TOK_LS)||"null"); if(t&&t.token&&Date.now()<t.exp){ gcalToken=t.token; gcalExp=t.exp; } }catch(e){} }
 
 /* ---- ramble tidier (offline heuristic; Phase 2 can upgrade to AI) ---- */
 function tidy(s){
@@ -814,7 +902,7 @@ let briefPicks;
 function renderBrief(){
   const nm=S.settings.name||"there";
   $("#briefHello").textContent="Good morning, "+nm;
-  const lo=leftovers(), cal=S.calendar, tk=dayKey();
+  const lo=leftovers(), cal=calEvents(), tk=dayKey();
   const bills=S.tasks.filter(t=>t.recur&&!t.done&&t.due&&t.due<=dayKey(addDays(new Date(),5)));
   $("#briefSum").textContent="Let's set up "+WD[new Date().getDay()]+". "+
     lo.length+" leftover"+(lo.length!==1?"s":"")+", "+cal.length+" event"+(cal.length!==1?"s":"")+", "+bills.length+" bill"+(bills.length!==1?"s":"")+" due.";
@@ -832,8 +920,11 @@ function renderBrief(){
   if(cal.length){
     h+='<div class="bsec-h"><span class="num">'+cal.length+'</span>From your calendar today</div>';
     cal.forEach(c=>{h+='<div class="brow"><div class="bbody"><div class="bttl">'+escapeHtml(c.title)+
-      '</div><div class="bsub">'+c.time+' · '+c.list+'</div></div>'+
-      '<button class="addbtn" data-cal="'+c.id+'">＋ Add</button></div>';});
+      '</div><div class="bsub">'+escapeHtml(c.time)+' · '+escapeHtml(c.list)+'</div></div>'+
+      '<button class="addbtn" data-cal="'+escapeHtml(c.id)+'">＋ Add</button></div>';});
+  }else if(gcalConfigured()&&!gcalConnected()){
+    h+='<div class="bsec-h"><span class="num">↻</span>From your calendar today</div>';
+    h+='<div class="brow"><div class="bbody"><div class="bsub">Connect Google Calendar in Settings to see today’s events.</div></div></div>';
   }
   if(bills.length){
     h+='<div class="bsec-h"><span class="num">'+bills.length+'</span>Recurring & bills due</div>';
@@ -856,7 +947,7 @@ function startDay(){
   // carry overs
   leftovers().forEach(t=>{if(briefPicks.carry[t.id]){t.day=tk;t.due=t.due&&t.due<tk?tk:t.due;}else{t.done=true;t.day=t.day;/* drop from today */ S.tasks=S.tasks.filter(x=>x.id!==t.id);}});
   // calendar picks
-  S.calendar.forEach(c=>{if(briefPicks.cal[c.id]){addTask({title:c.title,list:c.list,time:c.time,fromCal:true,due:tk,day:tk});}});
+  calEvents().forEach(c=>{if(briefPicks.cal[c.id]){addTask({title:c.title,list:c.list,time:c.time,fromCal:true,due:tk,day:tk});}});
   // reset bring list
   S.bring.forEach(b=>b.done=false);S.bringReset=tk;
   S.lastBriefDay=tk;save();
@@ -986,7 +1077,7 @@ function navTo(v,noNav){
   $("#app").classList.toggle("brief-open",v==="brief"||v==="recap");
   window.scrollTo(0,0);
   if(v==="today")render();
-  if(v==="brief")renderBrief();
+  if(v==="brief"){renderBrief(); if(gcalConnected())gcalFetchToday();}
   if(v==="recurring")renderRecurring();
   if(v==="recap"&&!noNav)renderRecap(false);
 }
@@ -1116,6 +1207,15 @@ function wire(){
     if(window.__dbCloud){ k?window.__dbCloud.connect(k):window.__dbCloud.disconnect(); }
     else if(!k){ const el=$("#syncStatus"); if(el){el.textContent="Off — your list is saved on this device only.";el.dataset.state="";} }
   };
+  // Google Calendar
+  $("#setGcalClient").value=(S.settings.gcalClient)||"";
+  refreshGcalStatus();
+  $("#setGcalClient").onchange=e=>{
+    S.settings.gcalClient=e.target.value.trim();save();
+    gcalTokenClient=null; // client id changed → rebuild token client on next connect
+    refreshGcalStatus();
+  };
+  $("#btnGcal").onclick=()=>{ gcalConnected()?gcalDisconnect():gcalConnect(); };
   $$("#themeSeg button").forEach(b=>b.onclick=()=>{S.settings.theme=b.dataset.theme;save();applyTheme();});
   $("#reseed").onclick=()=>{if(confirm("Reload the sample data? This replaces your current list.")){S=seed();save();applyTheme();navTo("today");toast("Sample data loaded");}};
   $("#wipe").onclick=()=>{if(confirm("Clear everything and start empty?")){S=seed();S.tasks=[];S.log=[];S.bring=[];save();navTo("today");toast("Cleared");}};
@@ -1125,6 +1225,7 @@ function wire(){
 load();
 activeTab=S.settings.tab||"personal";
 activeFilter=S.settings.filter||"week";
+gcalRestore();   // re-use a still-valid Google Calendar token from a previous session
 // daily bring reset if a new day arrived while closed
 if(S.bringReset!==dayKey()){S.bring.forEach(b=>b.done=false);S.bringReset=dayKey();save();}
 refreshRecurring(); // re-arm bills / する / chores whose next occurrence has arrived
