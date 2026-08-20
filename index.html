@@ -134,6 +134,9 @@
   .chip.done .box{background:var(--green);border-color:var(--green);position:relative}
   .chip.done .box::after{content:"✓";position:absolute;inset:0;color:#fff;font-size:11px;display:grid;place-items:center;font-weight:800}
   .chip.add{border-style:dashed;color:var(--muted)}
+  .chip.editing{background:var(--danger-bg,rgba(226,74,58,.1));border-color:transparent;color:var(--danger);text-decoration:none;animation:leaveWiggle .4s ease}
+  .chip.editing .rm{width:16px;height:16px;border-radius:50%;background:var(--danger);color:#fff;font-size:10px;font-weight:800;display:grid;place-items:center;flex:none}
+  @keyframes leaveWiggle{0%,100%{transform:rotate(0)}25%{transform:rotate(-1.5deg)}75%{transform:rotate(1.5deg)}}
 
   /* ---------- sections ---------- */
   .sec{margin-top:22px}
@@ -592,40 +595,56 @@ function gcalDisconnect(){
   refreshGcalStatus();
   if($("#v-brief")&&$("#v-brief").classList.contains("active"))renderBrief();
 }
+async function gcalShowErr(r){ // read Google's error body → friendly, actionable status line
+  let reason="", detail="";
+  try{ const err=await r.json(); reason=(err.error&&err.error.errors&&err.error.errors[0]&&err.error.errors[0].reason)||(err.error&&err.error.status)||""; detail=(err.error&&err.error.message)||""; }catch(_){}
+  const el=$("#gcalStatus"); if(!el)return;
+  let msg="Calendar error ("+r.status+").";
+  if(r.status===403){
+    if(/accessNotConfigured|SERVICE_DISABLED/i.test(reason+detail)){ const pm=(detail.match(/project[s]?\s+"?(\d{5,})"?/i)||[])[1]; msg="Calendar API isn't enabled in the project that owns your Client ID"+(pm?(" (project "+pm+")"):"")+". Enable “Google Calendar API” in THAT project, then reconnect."; }
+    else if(/insufficient|scope|ACCESS_TOKEN_SCOPE/i.test(reason+detail)) msg="Access wasn't granted for calendar. Disconnect, reconnect, and tick the calendar permission.";
+    else if(/rateLimitExceeded|quota/i.test(reason)) msg="Google rate-limited the request — try again shortly.";
+    else msg="Calendar access denied (403). Add yourself as a Test user on the OAuth consent screen, then reconnect.";
+  }
+  el.textContent=msg; el.dataset.state="err";
+}
 async function gcalFetchToday(){
   if(!gcalConnected())return;
   const now=new Date();
   const start=new Date(now.getFullYear(),now.getMonth(),now.getDate(),0,0,0);
   const end=new Date(now.getFullYear(),now.getMonth(),now.getDate(),23,59,59);
-  const url="https://www.googleapis.com/calendar/v3/calendars/primary/events?"+
-    "timeMin="+encodeURIComponent(start.toISOString())+"&timeMax="+encodeURIComponent(end.toISOString())+
-    "&singleEvents=true&orderBy=startTime&maxResults=25";
+  const tmin=encodeURIComponent(start.toISOString()), tmax=encodeURIComponent(end.toISOString());
+  const auth={headers:{Authorization:"Bearer "+gcalToken}};
   try{
-    const r=await fetch(url,{headers:{Authorization:"Bearer "+gcalToken}});
-    if(r.status===401){ gcalToken=null; gcalExp=0; try{localStorage.removeItem(GCAL_TOK_LS);}catch(e){} refreshGcalStatus(); return; }
-    if(!r.ok){
-      let reason="", detail="";
-      try{ const err=await r.json(); reason=(err.error&&err.error.errors&&err.error.errors[0]&&err.error.errors[0].reason)||(err.error&&err.error.status)||""; detail=(err.error&&err.error.message)||""; }catch(_){}
-      const el=$("#gcalStatus");
-      if(el){
-        let msg="Calendar error ("+r.status+").";
-        if(r.status===403){
-          if(/accessNotConfigured|SERVICE_DISABLED/i.test(reason+detail)){ const pm=(detail.match(/project[s]?\s+"?(\d{5,})"?/i)||[])[1]; msg="Calendar API isn't enabled in the project that owns your Client ID"+(pm?(" (project "+pm+")"):"")+". Enable “Google Calendar API” in THAT project, then reconnect."; }
-          else if(/insufficient|scope|ACCESS_TOKEN_SCOPE/i.test(reason+detail)) msg="Access wasn't granted for calendar. Disconnect, reconnect, and tick the calendar permission.";
-          else if(/rateLimitExceeded|quota/i.test(reason)) msg="Google rate-limited the request — try again shortly.";
-          else msg="Calendar access denied (403). Add yourself as a Test user on the OAuth consent screen, then reconnect.";
-        }
-        el.textContent=msg; el.dataset.state="err";
-      }
-      return;
-    }
-    const data=await r.json();
-    liveCal=(data.items||[]).map(ev=>({
-      id:ev.id,
-      title:ev.summary||"(untitled event)",
-      time: ev.start&&ev.start.dateTime ? fmtClock(new Date(ev.start.dateTime)) : "All day",
-      list:"personal"
+    // 1) all calendars this account can read — includes shared / subscribed, not just primary
+    const lr=await fetch("https://www.googleapis.com/calendar/v3/users/me/calendarList?maxResults=250&minAccessRole=reader",auth);
+    if(lr.status===401){ gcalToken=null; gcalExp=0; try{localStorage.removeItem(GCAL_TOK_LS);}catch(e){} refreshGcalStatus(); return; }
+    if(!lr.ok){ await gcalShowErr(lr); return; }
+    const list=(await lr.json()).items||[];
+    let cals=list.filter(c=>c.selected!==false); // honor the calendars the user keeps visible in Google
+    if(!cals.length) cals=[{id:"primary"}];
+    // 2) today's events from each calendar, in parallel (one failing calendar won't sink the rest)
+    const per=await Promise.all(cals.map(async c=>{
+      try{
+        const u="https://www.googleapis.com/calendar/v3/calendars/"+encodeURIComponent(c.id)+"/events?"+
+          "timeMin="+tmin+"&timeMax="+tmax+"&singleEvents=true&orderBy=startTime&maxResults=25";
+        const er=await fetch(u,auth);
+        if(!er.ok) return [];
+        const d=await er.json();
+        return (d.items||[]).map(ev=>({
+          id:ev.id, uid: ev.iCalUID||ev.id,
+          _start: ev.start&&ev.start.dateTime ? new Date(ev.start.dateTime).getTime() : 0,
+          title: ev.summary||"(untitled event)",
+          time: ev.start&&ev.start.dateTime ? fmtClock(new Date(ev.start.dateTime)) : "All day",
+          list:"personal"
+        }));
+      }catch(_){ return []; }
     }));
+    // 3) merge, dedup (same invite across calendars), sort (all-day first, then by start)
+    const seen={}, merged=[];
+    per.flat().forEach(ev=>{ if(!seen[ev.uid]){ seen[ev.uid]=1; merged.push(ev); } });
+    merged.sort((a,b)=>a._start-b._start);
+    liveCal=merged.map(({_start,uid,...rest})=>rest);
     refreshGcalStatus();
     if($("#v-brief")&&$("#v-brief").classList.contains("active"))renderBrief();
   }catch(e){ const el=$("#gcalStatus"); if(el){el.textContent="Couldn't reach Google Calendar.";el.dataset.state="err";} }
@@ -814,19 +833,29 @@ function render(){
   renderDone();
 }
 
+let leaveEditing=false;
 function renderLeave(){
   const wrap=$("#leaveChips");wrap.innerHTML="";
+  const eb=$("#editLeave"); if(eb)eb.textContent=leaveEditing?"Done":"Edit";
+  if(leaveEditing && !S.bring.length) leaveEditing=false;
   S.bring.forEach(b=>{
     const c=document.createElement("button");
-    c.className="chip"+(b.done?" done":"");
-    c.innerHTML='<span class="box"></span>'+escapeHtml(b.label);
-    c.onclick=()=>{b.done=!b.done;save();renderLeave();};
+    c.className="chip"+(b.done?" done":"")+(leaveEditing?" editing":"");
+    if(leaveEditing){
+      c.innerHTML='<span class="rm">✕</span>'+escapeHtml(b.label);
+      c.onclick=()=>{ S.bring=S.bring.filter(x=>x.id!==b.id); save(); renderLeave(); };
+    }else{
+      c.innerHTML='<span class="box"></span>'+escapeHtml(b.label);
+      c.onclick=()=>{b.done=!b.done;save();renderLeave();};
+    }
     wrap.appendChild(c);
   });
-  const add=document.createElement("button");
-  add.className="chip add";add.innerHTML="＋ add";
-  add.onclick=()=>{const l=prompt("Item to grab before leaving:");if(l&&l.trim()){S.bring.push({id:uid(),label:l.trim(),done:false});save();renderLeave();}};
-  wrap.appendChild(add);
+  if(!leaveEditing){
+    const add=document.createElement("button");
+    add.className="chip add";add.innerHTML="＋ add";
+    add.onclick=()=>{const l=prompt("Item to grab before leaving:");if(l&&l.trim()){S.bring.push({id:uid(),label:l.trim(),done:false});save();renderLeave();}};
+    wrap.appendChild(add);
+  }
 }
 
 function dueTag(t){
@@ -1187,10 +1216,8 @@ function wire(){
   };
   $("#hubLink").onclick=()=>{
     const s=S.tasks.find(t=>t.suru);
-    if(!s){toast("No する task to link yet");return;}
-    if(!s.done){toggleTask(s.id);toast("する done for today 🎌");}
-    else toast("する already done 🎌 · Phase 2 opens your hub");
-    // Phase 2: also window.open(your する hub URL)
+    if(s&&!s.done){toggleTask(s.id);toast("する done for today 🎌");}
+    window.open("https://cheungeric02.github.io/suru/","_blank","noopener");
   };
 
   // list tabs (Personal / Work) + date filter
@@ -1203,7 +1230,11 @@ function wire(){
 
   // done collapse
   $("#doneHd").onclick=()=>{$("#doneHd").classList.toggle("collapsed");$("#doneWrap").classList.toggle("collapsed");};
-  $("#editLeave").onclick=()=>toast("Tap a chip to check it · ＋ to add · long list editing in Phase 2");
+  $("#editLeave").onclick=()=>{
+    if(!S.bring.length){toast("Add an item first with ＋");return;}
+    leaveEditing=!leaveEditing; renderLeave();
+    if(leaveEditing)toast("Tap an item to remove it");
+  };
   $("#addRecur").onclick=()=>openEdit(null);
 
   // settings
