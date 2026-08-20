@@ -271,6 +271,8 @@
   .lrow{display:flex;align-items:center;gap:12px;padding:15px;border-bottom:1px solid var(--line)}
   .lrow:last-child{border-bottom:0}
   .lrow .lb{flex:1;min-width:0}
+  .lrow .lb.tap{cursor:pointer;border-radius:10px;margin:-6px -8px;padding:6px 8px;transition:background .15s}
+  .lrow .lb.tap:active{background:var(--surface-tonal)}
   .lrow .lb b{font-weight:600;font-size:15px}
   .lrow .lb span{display:block;font-size:12px;color:var(--muted);font-weight:600;margin-top:2px}
   .lrow .del{background:none;border:0;color:var(--danger);font-size:18px;cursor:pointer;padding:6px}
@@ -308,7 +310,7 @@
   .toast.show{opacity:1;transform:translateX(-50%) translateY(-6px)}
   .toast{display:inline-flex;align-items:center;gap:2px}
   .toast .tundo{margin-left:10px;background:var(--coral);color:var(--on-coral);border:0;font-family:inherit;
-    font-weight:800;font-size:12.5px;padding:6px 13px;border-radius:99px;cursor:pointer;flex:none}
+    font-weight:800;font-size:12.5px;padding:6px 13px;border-radius:99px;cursor:pointer;flex:none;pointer-events:auto}
   .toast .tundo:active{transform:scale(.94)}
 
   @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
@@ -1055,9 +1057,9 @@ function openEdit(id){
     const due=$("#eDue").value||null;const recur=cur.recur==="none"?null:cur.recur;
     if(t){Object.assign(t,{title,list:cur.list,due:(recur&&!due?dayKey():due),recur,pri:cur.pri,bill:cur.bill});}
     else addTask({title,list:cur.list,due:(recur&&!due?dayKey():due),recur,pri:cur.pri,bill:cur.bill,day:dayKey()});
-    save();closeSheet();render();
+    save();closeSheet();render();if($("#v-recurring").classList.contains("active"))renderRecurring();
   };
-  if(t)$("#eDel").onclick=()=>{pushUndo();S.tasks=S.tasks.filter(x=>x.id!==id);save();closeSheet();render();toast("Deleted",doUndo);};
+  if(t)$("#eDel").onclick=()=>{pushUndo();S.tasks=S.tasks.filter(x=>x.id!==id);save();closeSheet();render();if($("#v-recurring").classList.contains("active"))renderRecurring();toast("Deleted",doUndo);};
 }
 
 /* ============================================================
@@ -1067,10 +1069,11 @@ function renderRecurring(){
   const items=S.tasks.filter(t=>t.recur);
   const el=$("#recurList");
   el.innerHTML=items.length?items.map(t=>
-    '<div class="lrow"><div class="lb"><b>'+escapeHtml(t.title)+'</b><span>↻ '+t.recur+
+    '<div class="lrow"><div class="lb tap" data-edit="'+t.id+'"><b>'+escapeHtml(t.title)+'</b><span>↻ '+t.recur+
     (t.due?" · next "+niceDay(t.due):"")+(t.bill?" · 💳 bill":"")+'</span></div>'+
     '<button class="del" data-del="'+t.id+'">🗑</button></div>').join("")
     :'<div class="empty">No recurring items yet</div>';
+  $$('[data-edit]',el).forEach(b=>b.onclick=()=>openEdit(b.dataset.edit));
   $$('[data-del]',el).forEach(b=>b.onclick=()=>{pushUndo();S.tasks=S.tasks.filter(x=>x.id!==b.dataset.del);save();renderRecurring();render();toast("Deleted",doUndo);});
 }
 
