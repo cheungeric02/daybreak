@@ -112,6 +112,11 @@
   .qadd .mic.listening{animation:pulse 1s infinite}
   @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.12)}}
   .qhint{font-size:11.5px;color:var(--muted);margin:7px 4px 2px;font-weight:500;min-height:16px}
+  .synchint{font-size:12px;color:var(--ink-soft);margin:8px 2px 0;font-weight:600;line-height:1.45}
+  .synchint[data-state="on"]{color:var(--teal)}
+  .synchint[data-state="err"]{color:var(--danger)}
+  .synchint.dim{color:var(--muted);font-weight:500}
+  .synchint.dim b{color:var(--ink-soft);font-weight:700}
   .qhint b{color:var(--teal);font-weight:700}
   .qhint.parsed b{color:var(--coral)}
 
@@ -406,9 +411,15 @@
         <button data-theme="dark">Dark</button>
       </div>
     </div>
+    <div class="field">
+      <label>Cloud backup &amp; sync</label>
+      <input type="text" id="setSyncKey" placeholder="Choose a private key…" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <p class="synchint" id="syncStatus">Off — your list is saved on this device only.</p>
+      <p class="synchint dim">This key is also your <b>recovery key</b>: enter the same one on a new phone (or after clearing data) to restore everything. Keep it private — anyone with it can see your list.</p>
+    </div>
     <button class="ghostbtn" id="reseed">↺ Reload sample data</button>
     <button class="dangerbtn" id="wipe">Clear everything</button>
-    <p class="qhint" style="text-align:center;margin-top:18px">Daybreak · Phase 1 preview · saved on this device only</p>
+    <p class="qhint" style="text-align:center;margin-top:18px">Daybreak · saved on this device · cloud backup optional</p>
   </section>
 
   <!-- FAB + NAV -->
@@ -430,9 +441,12 @@
 <script>
 "use strict";
 /* ============================================================
-   Daybreak — Phase 1 (local, localStorage). No cloud yet.
+   Daybreak — local-first (localStorage) with optional Firebase
+   Realtime DB cloud backup + sync (see the module at end of file).
    ============================================================ */
 const KEY="daybreak.v1";
+const SYNCKEY_LS="daybreak_synckey";   // where the user's private sync key is remembered
+let booting=true;                      // while true, save() won't stamp updatedAt (keeps fresh reinstalls from clobbering the cloud)
 const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
 const uid=()=>Math.random().toString(36).slice(2,9);
@@ -452,7 +466,8 @@ let activeFilter="week";    // date filter: all|today|tomorrow|week|month
 function seed(){
   const tk=dayKey();
   return {
-    settings:{name:"Eric",wkday:"06:45",wkend:"08:00",night:"23:00",theme:"auto",tab:"personal",filter:"week"},
+    settings:{name:"Eric",wkday:"06:45",wkend:"08:00",night:"23:00",theme:"auto",tab:"personal",filter:"week",syncKey:""},
+    updatedAt:0,   // 0 = never edited by a person; keeps a fresh seed from ever overwriting the cloud backup
     bring:[{id:uid(),label:"Laptop",done:false},{id:uid(),label:"Gym bag",done:false},
            {id:uid(),label:"Meds",done:false},{id:uid(),label:"Umbrella",done:false}],
     bringReset:tk,
@@ -479,7 +494,40 @@ function load(){
   try{const raw=localStorage.getItem(KEY);if(raw){S=JSON.parse(raw);return;}}catch(e){}
   S=seed();save();
 }
-function save(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}}
+function save(){
+  if(!booting)S.updatedAt=Date.now();            // mark genuine user edits so the newest copy wins across devices
+  try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}
+  scheduleCloudPush();
+}
+/* Persist to localStorage WITHOUT stamping/pushing — used when adopting a copy that came FROM the cloud. */
+function saveLocalOnly(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}}
+
+/* ---- cloud bridge (talks to the Firebase module at the end of the file) ---- */
+let cloudPushT=null;
+function scheduleCloudPush(){
+  if(!window.__dbCloud||!window.__dbCloud.connected)return;
+  clearTimeout(cloudPushT);
+  cloudPushT=setTimeout(()=>window.__dbCloud.push(S),500);   // debounce bursts (e.g. typing a name)
+}
+// The module calls these:
+window.__dbData=()=>S;                              // current state to seed an empty cloud slot
+window.__dbApplyRemote=obj=>{                        // a copy arrived from the cloud
+  if(!obj||typeof obj!=="object")return;
+  const rt=obj.updatedAt||0, lt=(S&&S.updatedAt)||0;
+  if(rt>=lt){                                        // cloud is newer (or equal) → adopt it
+    S=obj;
+    saveLocalOnly();
+    activeTab=(S.settings&&S.settings.tab)||activeTab;
+    activeFilter=(S.settings&&S.settings.filter)||activeFilter;
+    try{applyTheme();render();}catch(e){}
+  }else{                                             // local is newer (offline edits) → push it up
+    if(window.__dbCloud)window.__dbCloud.push(S);
+  }
+};
+window.__dbCloudStatus=(msg,state)=>{
+  const el=document.getElementById("syncStatus");
+  if(el){el.textContent=msg;el.dataset.state=state||"";}
+};
 
 /* ---- ramble tidier (offline heuristic; Phase 2 can upgrade to AI) ---- */
 function tidy(s){
@@ -1059,6 +1107,15 @@ function wire(){
   $("#setWkday").onchange=e=>{S.settings.wkday=e.target.value;save();};
   $("#setWkend").onchange=e=>{S.settings.wkend=e.target.value;save();};
   $("#setNight").onchange=e=>{S.settings.night=e.target.value;save();};
+  // cloud backup & sync key
+  $("#setSyncKey").value=(S.settings.syncKey)||"";
+  $("#setSyncKey").onchange=e=>{
+    const k=e.target.value.trim();
+    S.settings.syncKey=k;save();
+    try{k?localStorage.setItem(SYNCKEY_LS,k):localStorage.removeItem(SYNCKEY_LS);}catch(_){}
+    if(window.__dbCloud){ k?window.__dbCloud.connect(k):window.__dbCloud.disconnect(); }
+    else if(!k){ const el=$("#syncStatus"); if(el){el.textContent="Off — your list is saved on this device only.";el.dataset.state="";} }
+  };
   $$("#themeSeg button").forEach(b=>b.onclick=()=>{S.settings.theme=b.dataset.theme;save();applyTheme();});
   $("#reseed").onclick=()=>{if(confirm("Reload the sample data? This replaces your current list.")){S=seed();save();applyTheme();navTo("today");toast("Sample data loaded");}};
   $("#wipe").onclick=()=>{if(confirm("Clear everything and start empty?")){S=seed();S.tasks=[];S.log=[];S.bring=[];save();navTo("today");toast("Cleared");}};
@@ -1075,11 +1132,69 @@ S.lastSeenDay=dayKey();save();
 applyTheme();
 wire();
 navTo("today");
+booting=false;   // from here on, save() stamps updatedAt and pushes to the cloud
+
+/* Ask the browser not to auto-evict our data under storage pressure (installed PWAs are usually granted this). */
+if(navigator.storage&&navigator.storage.persist){navigator.storage.persist().catch(()=>{});}
 
 /* PWA: register the service worker so Daybreak installs to the home screen and works offline */
 if("serviceWorker" in navigator){
   addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}));
 }
 </script>
+
+<!-- ============================ Firebase Realtime DB (bon-echo) — cloud backup + sync ============================
+     Same shared project the other apps use; Daybreak lives under its own "daybreak/<key>/blob" node.
+     Whole-state blob, newest-wins by updatedAt. No account needed — the private key namespaces (and gates) the data. -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+  import { getDatabase, ref, onValue, set, off } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
+  const firebaseConfig = {
+    apiKey: "AIzaSyD9AJbPC9M4gpTyvfIoRcqILq0ZOom1OBs",
+    authDomain: "bon-echo-bd946.firebaseapp.com",
+    databaseURL: "https://bon-echo-bd946-default-rtdb.firebaseio.com",
+    projectId: "bon-echo-bd946",
+    storageBucket: "bon-echo-bd946.firebasestorage.app",
+    messagingSenderId: "196437731482",
+    appId: "1:196437731482:web:3ac836962ce7d89e735723"
+  };
+  const status=(m,s)=>{ if(window.__dbCloudStatus) window.__dbCloudStatus(m,s); };
+  const sanitize=k=>k.replace(/[.#$\[\]\/\s]+/g,"_").slice(0,64);
+  try{
+    const app=initializeApp(firebaseConfig); const db=getDatabase(app); let curRef=null; let lastSent="";
+    window.__dbCloud={
+      ready:true, connected:false,
+      connect(key){
+        const safe=sanitize(key); if(!safe){ status("Enter a private key to turn on cloud backup.","err"); return; }
+        if(curRef) off(curRef);
+        curRef=ref(db,"daybreak/"+safe+"/blob"); this.connected=true; lastSent=""; status("Connecting…","");
+        onValue(curRef, snap=>{
+          this.connected=true;
+          const v=snap.val();
+          if(v){
+            if(v===lastSent){ status("Backed up to cloud ✓","on"); return; } // echo of our own write
+            lastSent=v;
+            status("Backed up to cloud ✓","on");
+            try{ if(window.__dbApplyRemote) window.__dbApplyRemote(JSON.parse(v)); }catch(e){}
+          }else{
+            // nothing in the cloud yet — seed it from this device
+            status("Backed up to cloud ✓","on");
+            const data=window.__dbData?window.__dbData():null; if(data) this.push(data);
+          }
+        }, err=>{ this.connected=false; status("Cloud sync error — check the database rules in Firebase.","err"); console.warn("[Daybreak] DB read error:",err); });
+      },
+      disconnect(){ if(curRef) off(curRef); curRef=null; this.connected=false; lastSent=""; status("Off — your list is saved on this device only.",""); },
+      push(obj){
+        if(!curRef||!this.connected||!obj) return;
+        const s=JSON.stringify(obj); if(s===lastSent) return; lastSent=s;
+        set(curRef,s).catch(e=>{ status("Cloud sync error — check the database rules in Firebase.","err"); console.warn("[Daybreak] DB write error:",e); });
+      }
+    };
+    let saved=""; try{ saved=localStorage.getItem("daybreak_synckey")||""; }catch(e){}
+    if(saved) window.__dbCloud.connect(saved);
+    else status("Off — your list is saved on this device only.","");
+  }catch(e){ console.error("[Daybreak] Firebase init failed:",e); status("Cloud backup couldn't start here.","err"); }
+</script>
+
 </body>
 </html>

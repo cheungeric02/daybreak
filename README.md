@@ -21,6 +21,10 @@ Then open http://localhost:8777.
 - Material 3 Expressive design; Bricolage Grotesque + Plus Jakarta Sans.
 - PWA: `manifest.webmanifest` + `sw.js` service worker for offline + installability.
 
+## Cloud backup & sync
+
+Optional. Turn it on in **Settings → Cloud backup & sync** by entering a private key. Your whole list is mirrored to Firebase Realtime Database at `daybreak/<key>/blob` (newest copy wins via an `updatedAt` stamp). The key is also your **recovery key** — enter the same one on a new phone, or after clearing data, to restore everything.
+
 ## Roadmap
 
-Phase 2 adds optional private cloud sync and Google sign-in so the same list follows you across devices.
+Next: real Google Calendar read and optional push reminders.
