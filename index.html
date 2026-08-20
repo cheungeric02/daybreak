@@ -603,7 +603,22 @@ async function gcalFetchToday(){
   try{
     const r=await fetch(url,{headers:{Authorization:"Bearer "+gcalToken}});
     if(r.status===401){ gcalToken=null; gcalExp=0; try{localStorage.removeItem(GCAL_TOK_LS);}catch(e){} refreshGcalStatus(); return; }
-    if(!r.ok){ const el=$("#gcalStatus"); if(el){el.textContent="Calendar error ("+r.status+").";el.dataset.state="err";} return; }
+    if(!r.ok){
+      let reason="", detail="";
+      try{ const err=await r.json(); reason=(err.error&&err.error.errors&&err.error.errors[0]&&err.error.errors[0].reason)||(err.error&&err.error.status)||""; detail=(err.error&&err.error.message)||""; }catch(_){}
+      const el=$("#gcalStatus");
+      if(el){
+        let msg="Calendar error ("+r.status+").";
+        if(r.status===403){
+          if(/accessNotConfigured|SERVICE_DISABLED/i.test(reason+detail)) msg="Calendar API isn't enabled on your Google Cloud project. Enable “Google Calendar API”, then reconnect.";
+          else if(/insufficient|scope|ACCESS_TOKEN_SCOPE/i.test(reason+detail)) msg="Access wasn't granted for calendar. Disconnect, reconnect, and tick the calendar permission.";
+          else if(/rateLimitExceeded|quota/i.test(reason)) msg="Google rate-limited the request — try again shortly.";
+          else msg="Calendar access denied (403). Add yourself as a Test user on the OAuth consent screen, then reconnect.";
+        }
+        el.textContent=msg; el.dataset.state="err";
+      }
+      return;
+    }
     const data=await r.json();
     liveCal=(data.items||[]).map(ev=>({
       id:ev.id,
