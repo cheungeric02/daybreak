@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Daybreak">
+  <defs>
+    <linearGradient id="sky" x1="70" y1="30" x2="450" y2="480" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FF7A4D"/>
+      <stop offset="0.52" stop-color="#F2643C"/>
+      <stop offset="1" stop-color="#0E7C86"/>
+    </linearGradient>
+    <clipPath id="above"><rect x="0" y="0" width="512" height="318"/></clipPath>
+  </defs>
+  <rect width="512" height="512" fill="url(#sky)"/>
+  <!-- rising sun (top half shows above the horizon) -->
+  <g clip-path="url(#above)">
+    <circle cx="256" cy="318" r="106" fill="#FFE2B0"/>
+  </g>
+  <!-- rays -->
+  <g fill="none" stroke="#FFEECB" stroke-width="17" stroke-linecap="round" opacity="0.96">
+    <line x1="256" y1="150" x2="256" y2="118"/>
+    <line x1="150" y1="200" x2="128" y2="178"/>
+    <line x1="362" y1="200" x2="384" y2="178"/>
+    <line x1="196" y1="166" x2="182" y2="140"/>
+    <line x1="316" y1="166" x2="330" y2="140"/>
+  </g>
+  <!-- horizon -->
+  <rect x="118" y="318" width="276" height="17" rx="8.5" fill="#FFFFFF"/>
+  <rect x="150" y="356" width="212" height="14" rx="7" fill="#FFFFFF" opacity="0.55"/>
+</svg>
