@@ -476,7 +476,10 @@ const WD=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"
 const MO=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
 /* ---- date helpers (local time) ---- */
-function dayKey(d=new Date()){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
+/* The "day" rolls over at 3 AM, not midnight (like the する hub) — Eric works late and wants
+   a task done at 1 AM to count for the day he's ending. Shift back 3h before taking the date. */
+const DAY_RESET_HOUR=3;
+function dayKey(d=new Date()){const s=new Date(d.getTime()-DAY_RESET_HOUR*3600*1000);return s.getFullYear()+"-"+String(s.getMonth()+1).padStart(2,"0")+"-"+String(s.getDate()).padStart(2,"0");}
 function parseKey(k){const[y,m,d]=k.split("-").map(Number);return new Date(y,m-1,d);}
 function addDays(d,n){const x=new Date(d);x.setDate(x.getDate()+n);return x;}
 function isWeekend(d=new Date()){const g=d.getDay();return g===0||g===6;}
@@ -846,7 +849,8 @@ function render(){
   const hr=now.getHours();
   const salut=hr<12?"Morning":hr<17?"Afternoon":"Evening";
   $("#hello").textContent=salut+", "+nm+" "+(hr<12?"☀️":hr<18?"":"🌙");
-  $("#date").textContent=WD[now.getDay()]+", "+MO[now.getMonth()]+" "+now.getDate();
+  const dd=parseKey(tk); // logical day (rolls at 3 AM) — keep the shown date consistent with today's tasks
+  $("#date").textContent=WD[dd.getDay()]+", "+MO[dd.getMonth()]+" "+dd.getDate();
   $("#streakN").textContent=streak();
 
   // progress
@@ -874,10 +878,7 @@ function updateHubButton(){
    the Hub button goes green. Same-origin apps → the sync key is in localStorage.
    The suru "day" rolls over at 3 AM (matches the hub). No writes — read-only.
    ============================================================ */
-function suruDayKey(d=new Date()){                        // suru day rolls at 3 AM, not midnight
-  const s=new Date(d.getTime()-3*3600*1000);
-  return s.getFullYear()+"-"+String(s.getMonth()+1).padStart(2,"0")+"-"+String(s.getDate()).padStart(2,"0");
-}
+const suruDayKey=dayKey; // Daybreak's day now also rolls at 3 AM — same boundary as the hub
 function suruCoerce(v){ if(typeof v==="string"){try{return JSON.parse(v);}catch(_){return null;}} return v; }
 function suruDayDone(sig){
   if(!sig)return false;
@@ -1028,7 +1029,7 @@ function renderBrief(){
   $("#briefHello").textContent="Good morning, "+nm;
   const lo=leftovers(), cal=calEvents(), tk=dayKey();
   const bills=S.tasks.filter(t=>t.recur&&!t.done&&t.due&&t.due<=dayKey(addDays(new Date(),5)));
-  $("#briefSum").textContent="Let's set up "+WD[new Date().getDay()]+". "+
+  $("#briefSum").textContent="Let's set up "+WD[parseKey(tk).getDay()]+". "+
     lo.length+" leftover"+(lo.length!==1?"s":"")+", "+cal.length+" event"+(cal.length!==1?"s":"")+", "+bills.length+" bill"+(bills.length!==1?"s":"")+" due.";
   briefPicks={carry:{},cal:{},bills:{}};
   lo.forEach(t=>briefPicks.carry[t.id]=true);
