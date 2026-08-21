@@ -64,6 +64,7 @@
   button{font-family:inherit}
   .app{max-width:520px;margin:0 auto;min-height:100%;position:relative;
     padding:0 16px calc(112px + env(safe-area-inset-bottom));}
+  .app.today-open{padding-bottom:calc(172px + env(safe-area-inset-bottom))} /* clear docked composer + nav */
   .app.brief-open,.app.recap-open{padding-bottom:24px}
 
   /* ---------- greeting ---------- */
@@ -101,16 +102,26 @@
   .banner .bt span{font-size:12.5px;opacity:.92;font-weight:500}
   .banner .go{font-size:22px;opacity:.9}
 
-  /* ---------- quick add ---------- */
-  .qadd{display:flex;align-items:center;gap:8px;margin:16px 0 6px;background:var(--surface);
-    border-radius:var(--r-pill);padding:5px 6px 5px 18px;box-shadow:var(--shadow);border:1px solid var(--line)}
+  /* ---------- docked composer (bottom, above the nav) ---------- */
+  .dock{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(94px + env(safe-area-inset-bottom));
+    width:min(488px,calc(100% - 32px));z-index:35;display:none}
+  .app.today-open .dock{display:block} /* composer only on the Today view */
+  .qadd{display:flex;align-items:center;gap:7px;background:var(--surface);
+    border-radius:var(--r-pill);padding:5px 6px 5px 18px;box-shadow:var(--shadow-lg);border:1px solid var(--line)}
   .qadd input{flex:1;border:0;background:transparent;color:var(--ink);font-size:15.5px;font-weight:500;
-    font-family:inherit;padding:10px 0;outline:none;min-width:0}
+    font-family:inherit;padding:11px 0;outline:none;min-width:0}
   .qadd input::placeholder{color:var(--muted)}
-  .qadd .mic{width:42px;height:42px;border-radius:50%;flex:none;background:var(--coral);border:0;color:var(--on-coral);
-    display:grid;place-items:center;font-size:18px;box-shadow:0 4px 12px rgba(242,100,60,.4);cursor:pointer;transition:.2s}
-  .qadd .mic.listening{animation:pulse 1s infinite}
+  .qadd .mic{width:42px;height:42px;border-radius:50%;flex:none;background:var(--surface-tonal);border:0;color:var(--coral-deep);
+    display:grid;place-items:center;font-size:18px;cursor:pointer;transition:.2s}
+  .qadd .mic.listening{animation:pulse 1s infinite;background:var(--coral);color:var(--on-coral)}
+  .qadd .plus{width:44px;height:44px;border-radius:50%;flex:none;background:var(--coral);border:0;color:var(--on-coral);
+    display:grid;place-items:center;font-size:26px;font-weight:300;line-height:1;box-shadow:0 4px 12px rgba(242,100,60,.4);cursor:pointer;transition:.15s}
+  .qadd .plus:active{transform:scale(.9)}
   @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.12)}}
+  /* dock hint — hidden until you're typing/parsing or just added something */
+  .dock .qhint{font-size:11.5px;color:var(--muted);margin:0 12px 7px;font-weight:600;
+    display:none;line-height:1.4;text-shadow:0 1px 6px var(--ground)}
+  .dock .qhint.on{display:block}
   .qhint{font-size:11.5px;color:var(--muted);margin:7px 4px 2px;font-weight:500;min-height:16px}
   .synchint{font-size:12px;color:var(--ink-soft);margin:8px 2px 0;font-weight:600;line-height:1.45}
   .synchint[data-state="on"]{color:var(--teal)}
@@ -201,11 +212,7 @@
   .donehd.collapsed .chev{transform:rotate(-90deg)}
   .donewrap.collapsed{display:none}
 
-  /* ---------- FAB + nav ---------- */
-  .fab{position:fixed;left:50%;transform:translateX(calc(-50% + 210px));bottom:calc(106px + env(safe-area-inset-bottom));
-    width:58px;height:58px;border-radius:20px;background:var(--coral);color:var(--on-coral);border:0;display:grid;place-items:center;
-    font-size:28px;font-weight:300;box-shadow:0 8px 22px rgba(242,100,60,.5);cursor:pointer;z-index:40}
-  @media (max-width:520px){.fab{left:auto;right:20px;transform:none}}
+  /* ---------- nav ---------- */
   .nav{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(12px + env(safe-area-inset-bottom));
     width:min(488px,calc(100% - 32px));background:var(--surface);border:1px solid var(--line);border-radius:26px;
     display:flex;justify-content:space-around;padding:10px 8px;box-shadow:var(--shadow);z-index:30}
@@ -214,6 +221,10 @@
   .nav button .ico{font-size:19px}
   .nav button.on{color:var(--coral)}
   .nav button.suru{color:var(--teal)}
+  .nav button.suru.done{color:var(--green)} /* する task complete for today */
+  .nav button.suru.done .ico{position:relative}
+  .nav button.suru.done .ico::after{content:"✓";position:absolute;right:-9px;top:-7px;font-size:11px;
+    background:var(--green);color:#fff;width:15px;height:15px;border-radius:50%;display:grid;place-items:center;font-weight:900}
 
   /* ---------- views ---------- */
   .view{display:none}
@@ -304,13 +315,14 @@
     font-family:var(--font-display);font-weight:700;font-size:16px;cursor:pointer;margin-top:8px}
 
   canvas.confetti{position:fixed;inset:0;pointer-events:none;z-index:80}
-  .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(96px + env(safe-area-inset-bottom));
+  .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(172px + env(safe-area-inset-bottom));
     background:var(--ink);color:var(--ground);padding:11px 18px;border-radius:var(--r-pill);font-weight:700;font-size:13.5px;
-    z-index:90;opacity:0;transition:.25s;pointer-events:none;box-shadow:var(--shadow-lg)}
+    z-index:95;opacity:0;transition:.25s;pointer-events:none;box-shadow:var(--shadow-lg);max-width:calc(100% - 28px)}
   .toast.show{opacity:1;transform:translateX(-50%) translateY(-6px)}
   .toast{display:inline-flex;align-items:center;gap:2px}
-  .toast .tundo{margin-left:10px;background:var(--coral);color:var(--on-coral);border:0;font-family:inherit;
-    font-weight:800;font-size:12.5px;padding:6px 13px;border-radius:99px;cursor:pointer;flex:none;pointer-events:auto}
+  .toast.undoable{pointer-events:auto;cursor:pointer;padding:9px 9px 9px 18px}
+  .toast .tundo{margin-left:12px;background:var(--coral);color:var(--on-coral);border:0;font-family:inherit;
+    font-weight:800;font-size:13.5px;padding:10px 18px;border-radius:99px;cursor:pointer;flex:none;pointer-events:auto}
   .toast .tundo:active{transform:scale(.94)}
 
   @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
@@ -336,17 +348,6 @@
       <div class="prog"><i id="progbar" style="width:0%"></i></div>
       <p class="progtxt" id="progtxt"></p>
     </div>
-
-    <div class="banner" id="banner">
-      <div class="bt"><b id="bannerT">Good morning</b><span id="bannerS">Set up your day →</span></div>
-      <div class="go">→</div>
-    </div>
-
-    <div class="qadd">
-      <input id="qinput" placeholder="Add anything…" autocomplete="off" enterkeyhint="done">
-      <button class="mic" id="mic" title="Voice add" aria-label="Voice add">🎙</button>
-    </div>
-    <p class="qhint" id="qhint">Try “pay Visa friday” or “gym tomorrow 6pm !” &nbsp;·&nbsp; tap 🎙 to speak</p>
 
     <div class="leave" id="leave">
       <div class="lh">
@@ -434,8 +435,17 @@
     <p class="qhint" style="text-align:center;margin-top:18px">Daybreak · saved on this device · cloud backup optional</p>
   </section>
 
-  <!-- FAB + NAV -->
-  <button class="fab" id="fab" aria-label="Add task">＋</button>
+  <!-- docked composer — fixed above the nav; only shown on the Today view (via .app.today-open) -->
+  <div class="dock">
+    <p class="qhint" id="qhint"></p>
+    <div class="qadd">
+      <input id="qinput" placeholder="Add anything…" autocomplete="off" enterkeyhint="done">
+      <button class="mic" id="mic" title="Voice add" aria-label="Voice add">🎙</button>
+      <button class="plus" id="fab" title="Add" aria-label="Add task">＋</button>
+    </div>
+  </div>
+
+  <!-- NAV -->
   <nav class="nav">
     <button class="on" data-nav="today"><span class="ico">✓</span>Today</button>
     <button data-nav="brief"><span class="ico">☀️</span>Brief</button>
@@ -568,32 +578,56 @@ function loadGis(){ return new Promise((res,rej)=>{
   const s=document.createElement("script"); s.src="https://accounts.google.com/gsi/client"; s.async=true; s.defer=true;
   s.onload=()=>res(); s.onerror=()=>rej(new Error("gsi")); document.head.appendChild(s);
 });}
+let gcalSilent=false;   // true while a no-popup background refresh is in flight
+const GCAL_ON_LS="daybreak_gcal_on";  // remembers (per-device) that the user has connected before
+function gcalEnsureClient(){
+  if(gcalTokenClient)return;
+  gcalTokenClient=google.accounts.oauth2.initTokenClient({
+    client_id:gcalClientId(),
+    scope:"https://www.googleapis.com/auth/calendar.readonly",
+    callback:resp=>{
+      if(resp&&resp.access_token){
+        gcalToken=resp.access_token;
+        gcalExp=Date.now()+((resp.expires_in||3600)*1000)-60000;
+        try{localStorage.setItem(GCAL_TOK_LS,JSON.stringify({token:gcalToken,exp:gcalExp}));}catch(e){}
+        try{localStorage.setItem(GCAL_ON_LS,"1");}catch(e){}
+        gcalSilent=false;
+        gcalFetchToday(); refreshGcalStatus();
+      }else{
+        if(gcalSilent){ gcalSilent=false; return; } // silent refresh failed → stay quiet, keep sample events
+        const el=$("#gcalStatus"); if(el){el.textContent="Couldn't get access — try again.";el.dataset.state="err";}
+      }
+    }
+  });
+}
 async function gcalConnect(){
   if(!gcalConfigured()){ const el=$("#gcalStatus"); if(el){el.textContent="Paste your OAuth Client ID first.";el.dataset.state="err";} return; }
   try{
     await loadGis();
-    if(!gcalTokenClient){
-      gcalTokenClient=google.accounts.oauth2.initTokenClient({
-        client_id:gcalClientId(),
-        scope:"https://www.googleapis.com/auth/calendar.readonly",
-        callback:resp=>{
-          if(resp&&resp.access_token){
-            gcalToken=resp.access_token;
-            gcalExp=Date.now()+((resp.expires_in||3600)*1000)-60000;
-            try{localStorage.setItem(GCAL_TOK_LS,JSON.stringify({token:gcalToken,exp:gcalExp}));}catch(e){}
-            gcalFetchToday();
-          }else{ const el=$("#gcalStatus"); if(el){el.textContent="Couldn't get access — try again.";el.dataset.state="err";} }
-        }
-      });
-    }
+    gcalEnsureClient();
     const el=$("#gcalStatus"); if(el){el.textContent="Opening Google sign-in…";el.dataset.state="";}
+    gcalSilent=false;
     gcalTokenClient.requestAccessToken({prompt: gcalToken?"":"consent"});
   }catch(e){ const el=$("#gcalStatus"); if(el){el.textContent="Google sign-in couldn't start here.";el.dataset.state="err";} }
+}
+// On boot, quietly renew an expiring token with NO popup — works for as long as Google keeps the grant
+// (Testing-mode consent lapses ~weekly, after which a one-tap Connect is needed again).
+async function gcalSilentRefresh(){
+  if(!gcalConfigured())return;
+  let seen=false; try{seen=localStorage.getItem(GCAL_ON_LS)==="1";}catch(e){}
+  if(!seen)return;
+  if(gcalToken&&Date.now()<gcalExp-120000){ if(gcalConnected())gcalFetchToday(); return; } // still fresh
+  try{
+    await loadGis();
+    gcalEnsureClient();
+    gcalSilent=true;
+    gcalTokenClient.requestAccessToken({prompt:""}); // "" = silent; only surfaces if Google decides interaction is required
+  }catch(e){ gcalSilent=false; }
 }
 function gcalDisconnect(){
   try{ if(gcalToken&&window.google&&google.accounts&&google.accounts.oauth2) google.accounts.oauth2.revoke(gcalToken,()=>{}); }catch(e){}
   gcalToken=null; gcalExp=0; liveCal=null;
-  try{localStorage.removeItem(GCAL_TOK_LS);}catch(e){}
+  try{localStorage.removeItem(GCAL_TOK_LS);localStorage.removeItem(GCAL_ON_LS);}catch(e){}
   refreshGcalStatus();
   if($("#v-brief")&&$("#v-brief").classList.contains("active"))renderBrief();
 }
@@ -820,20 +854,64 @@ function render(){
   const total=pend+done;
   const pct=total?Math.round(done/total*100):0;
   $("#progbar").style.width=pct+"%";
-  $("#progtxt").textContent=total? (pend===0? "All clear — nice work" : done+" of "+total+" done · keep going") : "Nothing yet — add something above";
-
-  // banner
-  const bn=$("#banner");
-  if(briefAvailable()){bn.classList.add("show");
-    const lo=leftovers().length;
-    $("#bannerT").textContent="Good "+salut.toLowerCase()+", "+nm;
-    $("#bannerS").textContent=(lo?lo+" to carry over · ":"")+"set up your day →";
-  } else bn.classList.remove("show");
+  $("#progtxt").textContent=total? (pend===0? "All clear — nice work" : done+" of "+total+" done · keep going") : "Nothing yet — add something below";
 
   renderLeave();
   renderActive();
   renderDone();
+  updateHubButton();
 }
+// する Hub nav button turns green (with a ✓) once today's する task is done
+function updateHubButton(){
+  const s=S.tasks.find(t=>t.suru);
+  const btn=$("#hubLink"); if(btn)btn.classList.toggle("done",!!(s&&s.done));
+}
+
+/* ============================================================
+   する HUB LINKAGE
+   Mirror the する hub's "day complete" (Anki + any one Claude app) from the
+   shared Firebase data. When the day is complete, auto-check the する task and
+   the Hub button goes green. Same-origin apps → the sync key is in localStorage.
+   The suru "day" rolls over at 3 AM (matches the hub). No writes — read-only.
+   ============================================================ */
+function suruDayKey(d=new Date()){                        // suru day rolls at 3 AM, not midnight
+  const s=new Date(d.getTime()-3*3600*1000);
+  return s.getFullYear()+"-"+String(s.getMonth()+1).padStart(2,"0")+"-"+String(s.getDate()).padStart(2,"0");
+}
+function suruCoerce(v){ if(typeof v==="string"){try{return JSON.parse(v);}catch(_){return null;}} return v; }
+function suruDayDone(sig){
+  if(!sig)return false;
+  const today=suruDayKey();
+  const hub=suruCoerce(sig.hub)||{}; const chk=(hub.checks&&hub.checks[today])||{};
+  const anki=!!chk.anki, kanji=!!chk.kanji;
+  // Sokudoku — any read whose (3 AM-shifted) day is today
+  let soku=false; const sk=suruCoerce(sig.soku);
+  const hist=Array.isArray(sk)?sk:((sk&&sk.history)||[]);
+  if(Array.isArray(hist))soku=hist.some(r=>{const ts=r&&(r.t||r.time||r.ts); return ts&&suruDayKey(new Date(ts))===today;});
+  // Kaiwa — stores calendar dates only; add the pre-3 AM grace the hub uses
+  let kaiwa=false; const kw=suruCoerce(sig.kaiwa);
+  const days=(kw&&kw.stats&&kw.stats.days)||[];
+  if(Array.isArray(days)){
+    const now=new Date();
+    const cal=now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,"0")+"-"+String(now.getDate()).padStart(2,"0");
+    kaiwa=days.includes(today)||(now.getHours()<3&&days.includes(cal));
+  }
+  return anki && (soku||kaiwa||kanji);
+}
+function markSuruDone(){
+  const s=S.tasks.find(t=>t.suru); if(!s||s.done)return;
+  const tk=dayKey();
+  let guard=""; try{guard=localStorage.getItem("daybreak_suru_auto")||"";}catch(_){}
+  if(guard===tk)return;                                   // already auto-checked today (respects a manual uncheck)
+  try{localStorage.setItem("daybreak_suru_auto",tk);}catch(_){}
+  s.done=true;s.doneAt=new Date().toISOString();s.doneDay=tk;
+  S.log.push({title:s.title,at:s.doneAt,day:tk,list:s.list});
+  if(s.recur)s.due=recurNext(s.due||tk,s.recur);
+  save();render();
+  toast("する day complete 🎌 — checked off");
+}
+// called by the Firebase module whenever the shared する data changes
+window.__dbSuruSignal=sig=>{ try{ if(suruDayDone(sig))markSuruDone(); updateHubButton(); }catch(e){} };
 
 let leaveEditing=false;
 function renderLeave(){
@@ -1122,6 +1200,7 @@ function navTo(v,noNav){
   VIEWS.forEach(x=>$("#v-"+x).classList.toggle("active",x===v));
   $$(".nav button[data-nav]").forEach(b=>b.classList.toggle("on",b.dataset.nav===v));
   $("#app").classList.toggle("brief-open",v==="brief"||v==="recap");
+  $("#app").classList.toggle("today-open",v==="today");
   window.scrollTo(0,0);
   if(v==="today")render();
   if(v==="brief"){renderBrief(); if(gcalConnected())gcalFetchToday();}
@@ -1130,12 +1209,15 @@ function navTo(v,noNav){
 }
 function toast(msg,undoFn){
   const t=$("#toast");clearTimeout(t._t);
+  t.classList.toggle("undoable",!!undoFn);
   if(undoFn){
+    const fire=e=>{ if(e){e.preventDefault();e.stopPropagation();} clearTimeout(t._t); t.classList.remove("show"); t.onclick=null; undoFn(); };
     t.innerHTML='<span>'+escapeHtml(msg)+'</span><button class="tundo">Undo</button>';
-    t.querySelector(".tundo").onclick=()=>{clearTimeout(t._t);t.classList.remove("show");undoFn();};
-  }else{t.textContent=msg;}
+    t.querySelector(".tundo").onclick=fire;
+    t.onclick=fire;                 // whole pill is tappable, not just the small button
+  }else{t.textContent=msg;t.onclick=null;}
   t.classList.add("show");
-  t._t=setTimeout(()=>t.classList.remove("show"),undoFn?5200:1900);
+  t._t=setTimeout(()=>{t.classList.remove("show");t.onclick=null;},undoFn?7000:1900);
 }
 
 /* ---- undo (snapshot the whole state before an easily-mis-tapped action) ---- */
@@ -1167,21 +1249,25 @@ function wire(){
   const qi=$("#qinput"),hint=$("#qhint");
   const DEFAULT_HINT='Ramble it — “ok I really need to pay the Visa bill friday” → I’ll tidy it &nbsp;·&nbsp; tap 🎙 to speak';
   let useTidy=true,curParse=null;
-  hint.innerHTML=DEFAULT_HINT;
+  const showHint=html=>{hint.innerHTML=html;hint.classList.add("on");};
+  const hideHint=()=>{hint.classList.remove("on","parsed");hint.innerHTML="";};
   function refreshHint(){
     const v=qi.value.trim();
-    if(v.length<2){curParse=null;hint.classList.remove("parsed");hint.innerHTML=DEFAULT_HINT;return;}
+    if(v.length<2){curParse=null;hint.classList.remove("parsed");
+      if(document.activeElement===qi)showHint(DEFAULT_HINT);else hideHint();return;}
     curParse=parseInput(v);const p=curParse;hint.classList.add("parsed");
     if(p.differs){
       const shown=useTidy?p.tidy:p.original;
-      hint.innerHTML='✨ '+(useTidy?'Tidied':'Your words')+': <b>'+escapeHtml(shown)+'</b> — '+describeParse(p)+
-        ' &nbsp;<span class="hlink" id="tidyToggle">'+(useTidy?'use my words':'use tidied ✨')+'</span>';
+      showHint('✨ '+(useTidy?'Tidied':'Your words')+': <b>'+escapeHtml(shown)+'</b> — '+describeParse(p)+
+        ' &nbsp;<span class="hlink" id="tidyToggle">'+(useTidy?'use my words':'use tidied ✨')+'</span>');
       const tg=$("#tidyToggle");if(tg)tg.onclick=e=>{e.stopPropagation();useTidy=!useTidy;refreshHint();};
     }else{
-      hint.innerHTML='Will add: <b>'+escapeHtml(p.original)+'</b> — '+describeParse(p);
+      showHint('Will add: <b>'+escapeHtml(p.original)+'</b> — '+describeParse(p));
     }
   }
   qi.addEventListener("input",()=>{useTidy=true;refreshHint();});
+  qi.addEventListener("focus",()=>{if(qi.value.trim().length<2)showHint(DEFAULT_HINT);});
+  qi.addEventListener("blur",()=>{setTimeout(()=>{if(qi.value.trim().length<2&&document.activeElement!==qi)hideHint();},160);});
   qi.addEventListener("keydown",e=>{if(e.key==="Enter")commitQuick();});
   function commitQuick(){
     const v=qi.value.trim();if(!v)return;
@@ -1189,9 +1275,9 @@ function wire(){
     const title=(p.differs&&!useTidy)?p.original:(p.differs?p.tidy:p.original);
     const list=p.list==="work"?"work":activeTab; // active tab is the default; "work" keywords still win
     addTask({title,list,pri:p.pri,due:p.due,bill:p.bill,recur:p.recur,time:p.time,day:dayKey()});
-    qi.value="";curParse=null;useTidy=true;hint.classList.remove("parsed");hint.innerHTML="Added ✓ — "+escapeHtml(title);
+    qi.value="";curParse=null;useTidy=true;hint.classList.remove("parsed");showHint("Added ✓ — "+escapeHtml(title));
     render();qi.focus();
-    setTimeout(()=>{if(!qi.value.trim())hint.innerHTML=DEFAULT_HINT;},1800);
+    setTimeout(()=>{if(!qi.value.trim()){if(document.activeElement===qi)showHint(DEFAULT_HINT);else hideHint();}},1800);
   }
 
   // voice — fills the box so you can review the tidy + choose before adding
@@ -1206,9 +1292,9 @@ function wire(){
 
   // nav
   $$("[data-nav]").forEach(b=>b.onclick=()=>navTo(b.dataset.nav));
-  $("#banner").onclick=()=>navTo("brief");
   $("#startDay").onclick=startDay;
-  $("#fab").onclick=()=>openEdit(null);
+  // the ＋ in the composer: if you've typed something, add it; otherwise open the full editor
+  $("#fab").onclick=()=>{ if(qi.value.trim())commitQuick(); else openEdit(null); };
   $("#scrim").onclick=closeSheet;
   $("#streak").onclick=()=>navTo("recap");
   $("#themeToggle").onclick=toggleTheme;
@@ -1275,6 +1361,7 @@ load();
 activeTab=S.settings.tab||"personal";
 activeFilter=S.settings.filter||"week";
 gcalRestore();   // re-use a still-valid Google Calendar token from a previous session
+gcalSilentRefresh();  // …and quietly renew it in the background if it's expiring — no popup
 // daily bring reset if a new day arrived while closed
 if(S.bringReset!==dayKey()){S.bring.forEach(b=>b.done=false);S.bringReset=dayKey();save();}
 refreshRecurring(); // re-arm bills / する / chores whose next occurrence has arrived
@@ -1343,6 +1430,19 @@ if("serviceWorker" in navigator){
     let saved=""; try{ saved=localStorage.getItem("daybreak_synckey")||""; }catch(e){}
     if(saved) window.__dbCloud.connect(saved);
     else status("Off — your list is saved on this device only.","");
+
+    /* ---- read-only mirror of the shared する data (same origin → its sync key is in localStorage) ---- */
+    try{
+      let sk=""; try{ sk=localStorage.getItem("suru_synckey")||localStorage.getItem("jp_cpm_synckey")
+        ||localStorage.getItem("c2k_synckey")||localStorage.getItem("kaiwa_synckey")||""; }catch(_){}
+      if(sk){
+        const s=sanitize(sk); const sig={hub:null,soku:null,kaiwa:null};
+        const emit=()=>{ if(window.__dbSuruSignal) window.__dbSuruSignal(sig); };
+        onValue(ref(db,"hub/"+s+"/log"),      snap=>{ sig.hub=snap.val();   emit(); }, ()=>{});
+        onValue(ref(db,"sokudoku/"+s+"/blob"), snap=>{ sig.soku=snap.val();  emit(); }, ()=>{});
+        onValue(ref(db,"kaiwa/"+s+"/blob"),    snap=>{ sig.kaiwa=snap.val(); emit(); }, ()=>{});
+      }
+    }catch(e){ console.warn("[Daybreak] する mirror unavailable:",e); }
   }catch(e){ console.error("[Daybreak] Firebase init failed:",e); status("Cloud backup couldn't start here.","err"); }
 </script>
 
