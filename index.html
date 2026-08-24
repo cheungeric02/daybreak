@@ -425,7 +425,6 @@
       <p class="synchint" id="gcalStatus">Off — showing sample events.</p>
       <p class="synchint dim">Read-only. Paste the OAuth <b>Client ID</b> from your Google Cloud project, then tap Connect. One-time setup steps are in the app’s README.</p>
     </div>
-    <button class="ghostbtn" id="reseed">↺ Reload sample data</button>
     <button class="dangerbtn" id="wipe">Clear everything</button>
     <p class="qhint" style="text-align:center;margin-top:18px">Daybreak · saved on this device · cloud backup optional</p>
   </section>
@@ -1294,7 +1293,6 @@ function wire(){
   };
   $("#btnGcal").onclick=()=>{ gcalConnected()?gcalDisconnect():gcalConnect(); };
   $$("#themeSeg button").forEach(b=>b.onclick=()=>{S.settings.theme=b.dataset.theme;save();applyTheme();});
-  $("#reseed").onclick=()=>{if(confirm("Reload the sample data? This replaces your current list.")){S=seed();save();applyTheme();navTo("today");toast("Sample data loaded");}};
   $("#wipe").onclick=()=>{if(confirm("Clear everything and start empty?")){S=seed();S.tasks=[];S.log=[];S.bring=[];save();navTo("today");toast("Cleared");}};
 }
 
