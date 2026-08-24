@@ -220,11 +220,6 @@
     background:none;border:0;cursor:pointer;padding:2px 6px}
   .nav button .ico{font-size:19px}
   .nav button.on{color:var(--coral)}
-  .nav button.suru{color:var(--teal)}
-  .nav button.suru.done{color:var(--green)} /* する task complete for today */
-  .nav button.suru.done .ico{position:relative}
-  .nav button.suru.done .ico::after{content:"✓";position:absolute;right:-9px;top:-7px;font-size:11px;
-    background:var(--green);color:#fff;width:15px;height:15px;border-radius:50%;display:grid;place-items:center;font-weight:900}
 
   /* ---------- views ---------- */
   .view{display:none}
@@ -406,7 +401,7 @@
   <!-- ===== SETTINGS ===== -->
   <section class="view" id="v-settings">
     <div class="vhead"><button class="back" data-nav="today">←</button><h2>Settings</h2></div>
-    <div class="field"><label>Your name</label><input type="text" id="setName" placeholder="Eric"></div>
+    <div class="field"><label>Your name</label><input type="text" id="setName" placeholder="Your name"></div>
     <div class="field"><label>Weekday wake time (morning brief)</label><input type="time" id="setWkday" value="06:45"></div>
     <div class="field"><label>Weekend wake time</label><input type="time" id="setWkend" value="08:00"></div>
     <div class="field"><label>Nightly recap</label><input type="time" id="setNight" value="23:00"></div>
@@ -451,7 +446,6 @@
     <button data-nav="brief"><span class="ico">☀️</span>Brief</button>
     <button data-nav="recurring"><span class="ico">↻</span>Recurring</button>
     <button data-nav="settings"><span class="ico">⚙</span>Settings</button>
-    <button class="suru" id="hubLink"><span class="ico">する</span>Hub</button>
   </nav>
 </div>
 
@@ -491,7 +485,7 @@ let activeFilter="week";    // date filter: all|today|tomorrow|week|month
 function seed(){
   const tk=dayKey();
   return {
-    settings:{name:"Eric",wkday:"06:45",wkend:"08:00",night:"23:00",theme:"auto",tab:"personal",filter:"week",syncKey:"",gcalClient:""},
+    settings:{name:"",wkday:"06:45",wkend:"08:00",night:"23:00",theme:"auto",tab:"personal",filter:"week",syncKey:"",gcalClient:""},
     updatedAt:0,   // 0 = never edited by a person; keeps a fresh seed from ever overwriting the cloud backup
     bring:[{id:uid(),label:"Laptop",done:false},{id:uid(),label:"Gym bag",done:false},
            {id:uid(),label:"Meds",done:false},{id:uid(),label:"Umbrella",done:false}],
@@ -501,7 +495,6 @@ function seed(){
       {id:uid(),title:"Pay hydro bill",list:"personal",pri:false,done:false,created:tk,day:tk,due:dayKey(addDays(new Date(),4)),bill:true,recur:"monthly"},
       {id:uid(),title:"Visa ····4021 payment",list:"personal",pri:false,done:false,created:tk,day:tk,due:dayKey(addDays(new Date(),3)),bill:true,recur:"monthly"},
       {id:uid(),title:"Text mom back",list:"personal",pri:false,done:false,created:tk,day:tk,due:null,bill:false,recur:null},
-      {id:uid(),title:"する — Japanese practice",list:"personal",pri:false,done:false,created:tk,day:tk,due:tk,bill:false,recur:"daily",suru:true},
       {id:uid(),title:"Send Q3 numbers to finance",list:"work",pri:false,done:false,created:tk,day:tk,due:null,bill:false,recur:null},
       {id:uid(),title:"Reply to vendor email",list:"work",pri:false,done:false,created:tk,day:tk,due:null,bill:false,recur:null},
     ],
@@ -749,6 +742,8 @@ function parseInput(raw){
   if(out.recur&&!out.due)out.due=dayKey(now);
   // clean title
   out.title=t.replace(/\s+/g," ").trim().replace(/^[-–,]\s*/,"");
+  // drop a preposition left dangling once its date/time word was stripped ("call the bank on" → "call the bank")
+  out.title=out.title.replace(/[\s,]+(?:on|by|at|due|this|next|coming|for)$/i,"").trim();
   if(!out.title)out.title=raw.trim();
   // Capitalize first letter
   out.title=out.title.charAt(0).toUpperCase()+out.title.slice(1);
@@ -863,56 +858,7 @@ function render(){
   renderLeave();
   renderActive();
   renderDone();
-  updateHubButton();
 }
-// する Hub nav button turns green (with a ✓) once today's する task is done
-function updateHubButton(){
-  const s=S.tasks.find(t=>t.suru);
-  const btn=$("#hubLink"); if(btn)btn.classList.toggle("done",!!(s&&s.done));
-}
-
-/* ============================================================
-   する HUB LINKAGE
-   Mirror the する hub's "day complete" (Anki + any one Claude app) from the
-   shared Firebase data. When the day is complete, auto-check the する task and
-   the Hub button goes green. Same-origin apps → the sync key is in localStorage.
-   The suru "day" rolls over at 3 AM (matches the hub). No writes — read-only.
-   ============================================================ */
-const suruDayKey=dayKey; // Daybreak's day now also rolls at 3 AM — same boundary as the hub
-function suruCoerce(v){ if(typeof v==="string"){try{return JSON.parse(v);}catch(_){return null;}} return v; }
-function suruDayDone(sig){
-  if(!sig)return false;
-  const today=suruDayKey();
-  const hub=suruCoerce(sig.hub)||{}; const chk=(hub.checks&&hub.checks[today])||{};
-  const anki=!!chk.anki, kanji=!!chk.kanji;
-  // Sokudoku — any read whose (3 AM-shifted) day is today
-  let soku=false; const sk=suruCoerce(sig.soku);
-  const hist=Array.isArray(sk)?sk:((sk&&sk.history)||[]);
-  if(Array.isArray(hist))soku=hist.some(r=>{const ts=r&&(r.t||r.time||r.ts); return ts&&suruDayKey(new Date(ts))===today;});
-  // Kaiwa — stores calendar dates only; add the pre-3 AM grace the hub uses
-  let kaiwa=false; const kw=suruCoerce(sig.kaiwa);
-  const days=(kw&&kw.stats&&kw.stats.days)||[];
-  if(Array.isArray(days)){
-    const now=new Date();
-    const cal=now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,"0")+"-"+String(now.getDate()).padStart(2,"0");
-    kaiwa=days.includes(today)||(now.getHours()<3&&days.includes(cal));
-  }
-  return anki && (soku||kaiwa||kanji);
-}
-function markSuruDone(){
-  const s=S.tasks.find(t=>t.suru); if(!s||s.done)return;
-  const tk=dayKey();
-  let guard=""; try{guard=localStorage.getItem("daybreak_suru_auto")||"";}catch(_){}
-  if(guard===tk)return;                                   // already auto-checked today (respects a manual uncheck)
-  try{localStorage.setItem("daybreak_suru_auto",tk);}catch(_){}
-  s.done=true;s.doneAt=new Date().toISOString();s.doneDay=tk;
-  S.log.push({title:s.title,at:s.doneAt,day:tk,list:s.list});
-  if(s.recur)s.due=recurNext(s.due||tk,s.recur);
-  save();render();
-  toast("する day complete 🎌 — checked off");
-}
-// called by the Firebase module whenever the shared する data changes
-window.__dbSuruSignal=sig=>{ try{ if(suruDayDone(sig))markSuruDone(); updateHubButton(); }catch(e){} };
 
 let leaveEditing=false;
 function renderLeave(){
@@ -1304,11 +1250,6 @@ function wire(){
     activeFilter="overdue";save();render();
     try{scrollTo({top:0,behavior:"smooth"});}catch(e){scrollTo(0,0);}
   };
-  $("#hubLink").onclick=()=>{
-    const s=S.tasks.find(t=>t.suru);
-    if(s&&!s.done){toggleTask(s.id);toast("する done for today 🎌");}
-    window.open("https://cheungeric02.github.io/suru/","_blank","noopener");
-  };
 
   // list tabs (Personal / Work) + date filter
   $$("#listTabs .ltab").forEach(b=>b.onclick=()=>{
@@ -1431,19 +1372,6 @@ if("serviceWorker" in navigator){
     let saved=""; try{ saved=localStorage.getItem("daybreak_synckey")||""; }catch(e){}
     if(saved) window.__dbCloud.connect(saved);
     else status("Off — your list is saved on this device only.","");
-
-    /* ---- read-only mirror of the shared する data (same origin → its sync key is in localStorage) ---- */
-    try{
-      let sk=""; try{ sk=localStorage.getItem("suru_synckey")||localStorage.getItem("jp_cpm_synckey")
-        ||localStorage.getItem("c2k_synckey")||localStorage.getItem("kaiwa_synckey")||""; }catch(_){}
-      if(sk){
-        const s=sanitize(sk); const sig={hub:null,soku:null,kaiwa:null};
-        const emit=()=>{ if(window.__dbSuruSignal) window.__dbSuruSignal(sig); };
-        onValue(ref(db,"hub/"+s+"/log"),      snap=>{ sig.hub=snap.val();   emit(); }, ()=>{});
-        onValue(ref(db,"sokudoku/"+s+"/blob"), snap=>{ sig.soku=snap.val();  emit(); }, ()=>{});
-        onValue(ref(db,"kaiwa/"+s+"/blob"),    snap=>{ sig.kaiwa=snap.val(); emit(); }, ()=>{});
-      }
-    }catch(e){ console.warn("[Daybreak] する mirror unavailable:",e); }
   }catch(e){ console.error("[Daybreak] Firebase init failed:",e); status("Cloud backup couldn't start here.","err"); }
 </script>
 
