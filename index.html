@@ -255,6 +255,33 @@
     font-size:16px;padding:16px;border-radius:var(--r-pill);cursor:pointer;box-shadow:0 8px 20px rgba(14,124,134,.35)}
   .briefempty{text-align:center;color:var(--muted);padding:18px;font-size:13.5px;font-weight:500}
 
+  /* ---------- shopping list ---------- */
+  .clearchk{margin-left:auto;background:var(--danger-bg);color:var(--danger);border:0;border-radius:99px;
+    padding:9px 15px;font-family:var(--font-body);font-weight:700;font-size:12.5px;cursor:pointer;flex:none}
+  .clearchk:active{transform:scale(.96)}
+  .shopadd{display:flex;gap:8px;margin:0 4px 10px}
+  .shopin{flex:1;padding:12px 15px;border-radius:14px;border:1px solid var(--line);background:var(--surface);
+    color:var(--ink);font-family:var(--font-body);font-size:14.5px;font-weight:600}
+  .shopin::placeholder{color:var(--muted);font-weight:500}
+  .shopin:focus{outline:none;border-color:var(--coral)}
+  .shopplus{width:46px;flex:none;border:0;border-radius:14px;background:var(--coral);color:var(--on-coral);
+    font-size:22px;font-weight:700;line-height:1;cursor:pointer}
+  .shopplus:active{transform:scale(.95)}
+  .sitem{display:flex;align-items:center;gap:13px;padding:13px 15px;border-bottom:1px solid var(--line)}
+  .sitem:last-child{border-bottom:0}
+  .sitem .check{width:24px;height:24px;border-radius:8px;border:2.5px solid var(--muted);flex:none;cursor:pointer;
+    transition:.18s;position:relative}
+  .sitem .body{flex:1;min-width:0;cursor:pointer}
+  .sitem .body .ttl{font-weight:600;font-size:15px;color:var(--ink);word-break:break-word}
+  .sitem .scat{font-size:11px;color:var(--muted);font-weight:700;margin-top:2px}
+  .sitem.done .body .ttl{color:var(--muted);text-decoration:line-through}
+  .sitem.done .check{background:var(--green);border-color:var(--green)}
+  .sitem.done .check::after{content:"✓";position:absolute;inset:0;display:grid;place-items:center;
+    color:var(--surface);font-size:14px;font-weight:800}
+  .sitem .srm{background:none;border:0;color:var(--muted);font-size:15px;line-height:1;cursor:pointer;
+    padding:7px;flex:none;border-radius:9px}
+  .sitem .srm:active{background:var(--ground-2)}
+
   /* ---------- recap / done ---------- */
   .allclear{display:flex;flex-direction:column;align-items:center;text-align:center;padding:30px 12px 10px}
   .burst{width:118px;height:118px;border-radius:50%;background:var(--green-bg);display:grid;place-items:center;font-size:62px;
@@ -373,15 +400,13 @@
     <div class="donewrap collapsed" id="doneWrap"><div class="card" id="listDone"></div></div>
   </section>
 
-  <!-- ===== BRIEF ===== -->
-  <section class="view" id="v-brief">
-    <div class="brief-hero">
-      <div class="t">Morning brief</div>
-      <h2 id="briefHello">Good morning, Eric</h2>
-      <p id="briefSum">Let's set up your day.</p>
+  <!-- ===== SHOPPING LIST ===== -->
+  <section class="view" id="v-shopping">
+    <div class="vhead">
+      <h2>🛒 Shopping List</h2>
+      <button class="clearchk" id="clearShop" hidden>Clear checked</button>
     </div>
-    <div id="briefBody"></div>
-    <button class="startbtn" id="startDay">Start my day →</button>
+    <div id="shopBody"></div>
   </section>
 
   <!-- ===== RECAP ===== -->
@@ -442,7 +467,7 @@
   <!-- NAV -->
   <nav class="nav">
     <button class="on" data-nav="today"><span class="ico">✓</span>Today</button>
-    <button data-nav="brief"><span class="ico">☀️</span>Brief</button>
+    <button data-nav="shopping"><span class="ico">🛒</span>Shopping</button>
     <button data-nav="recurring"><span class="ico">↻</span>Recurring</button>
     <button data-nav="settings"><span class="ico">⚙</span>Settings</button>
   </nav>
@@ -500,6 +525,12 @@ function seed(){
       {id:uid(),title:"Send Q3 numbers to finance",list:"work",pri:false,done:false,created:tk,day:tk,due:null,bill:false,recur:null},
       {id:uid(),title:"Reply to vendor email",list:"work",pri:false,done:false,created:tk,day:tk,due:null,bill:false,recur:null},
     ],
+    shopping:[
+      {id:uid(),name:"Rotisserie chicken",cat:"costco",done:false},
+      {id:uid(),name:"Paper towels",cat:"costco",done:false},
+      {id:uid(),name:"Milk",cat:"general",done:false},
+      {id:uid(),name:"Bananas",cat:"general",done:false},
+    ],
     calendar:[ /* mock calendar — Phase 2 replaces with real Google Calendar */
       {id:"c1",title:"Dentist appointment",time:"3:00 PM",list:"personal"},
       {id:"c2",title:"1:1 with Priya",time:"2:00 PM",list:"work"},
@@ -539,7 +570,7 @@ window.__dbApplyRemote=obj=>{                        // a copy arrived from the 
     saveLocalOnly();
     activeTab=(S.settings&&S.settings.tab)||activeTab;
     activeFilter=(S.settings&&S.settings.filter)||activeFilter;
-    try{applyTheme();render();}catch(e){}
+    try{applyTheme();render();if($("#v-shopping")&&$("#v-shopping").classList.contains("active"))renderShopping();}catch(e){}
   }else{                                             // local is newer (offline edits) → push it up
     if(window.__dbCloud)window.__dbCloud.push(S);
   }
@@ -889,6 +920,53 @@ function renderLeave(){
   }
 }
 
+/* ---------- shopping list ---------- */
+function shopCatLabel(c){return c==="costco"?"Costco":"General";}
+function shopItemHtml(i){
+  return '<div class="sitem'+(i.done?" done":"")+'" data-sid="'+i.id+'">'+
+    '<span class="check" data-schk="'+i.id+'"></span>'+
+    '<div class="body"><div class="ttl">'+escapeHtml(i.name)+'</div>'+
+      (i.done?'<div class="scat">'+shopCatLabel(i.cat)+'</div>':"")+'</div>'+
+    '<button class="srm" data-srm="'+i.id+'" aria-label="Remove">✕</button></div>';
+}
+function renderShopping(){
+  if(!Array.isArray(S.shopping))S.shopping=[];
+  const cats=[{key:"costco",label:"Costco",dot:"var(--teal)"},{key:"general",label:"General",dot:"var(--coral)"}];
+  let h="";
+  cats.forEach(c=>{
+    const items=S.shopping.filter(i=>i.cat===c.key&&!i.done);
+    h+='<div class="sec"><div class="sechd"><div class="l"><span class="dot" style="background:'+c.dot+'"></span>'+c.label+'</div><span class="count">'+items.length+'</span></div>';
+    h+='<div class="shopadd"><input class="shopin" data-cat="'+c.key+'" placeholder="Add to '+c.label+'…" autocomplete="off" enterkeyhint="done"><button class="shopplus" data-cat="'+c.key+'" aria-label="Add">＋</button></div>';
+    h+='<div class="card">'+(items.length?items.map(shopItemHtml).join(""):'<div class="empty">Nothing here yet</div>')+'</div></div>';
+  });
+  const done=S.shopping.filter(i=>i.done);
+  if(done.length){
+    h+='<div class="sec"><div class="sechd"><div class="l"><span class="dot" style="background:var(--green)"></span>In the cart</div><span class="count">'+done.length+'</span></div>';
+    h+='<div class="card">'+done.map(shopItemHtml).join("")+'</div></div>';
+  }
+  $("#shopBody").innerHTML=h;
+  const cb=$("#clearShop");if(cb){cb.hidden=!done.length;cb.textContent="Clear checked ("+done.length+")";}
+  // add
+  $$("#shopBody .shopplus").forEach(b=>b.onclick=()=>{const inp=b.parentElement.querySelector(".shopin");shopAdd(b.dataset.cat,inp.value);inp.value="";inp.focus();});
+  $$("#shopBody .shopin").forEach(inp=>inp.addEventListener("keydown",e=>{if(e.key==="Enter"){shopAdd(inp.dataset.cat,inp.value);inp.value="";}}));
+  // toggle (checkbox or body) + remove
+  $$("#shopBody [data-schk]").forEach(el=>el.onclick=()=>shopToggle(el.dataset.schk));
+  $$("#shopBody .sitem .body").forEach(el=>el.onclick=()=>shopToggle(el.parentElement.dataset.sid));
+  $$("#shopBody .srm").forEach(el=>el.onclick=e=>{e.stopPropagation();shopRemove(el.dataset.srm);});
+}
+function shopAdd(cat,name){
+  name=(name||"").trim();if(!name)return;
+  S.shopping.push({id:uid(),name,cat:cat==="costco"?"costco":"general",done:false});
+  save();renderShopping();
+}
+function shopToggle(id){const i=S.shopping.find(x=>x.id===id);if(!i)return;i.done=!i.done;save();renderShopping();}
+function shopRemove(id){S.shopping=S.shopping.filter(x=>x.id!==id);save();renderShopping();}
+function shopClearChecked(){
+  const n=S.shopping.filter(i=>i.done).length;if(!n)return;
+  S.shopping=S.shopping.filter(i=>!i.done);save();renderShopping();
+  toast("Cleared "+n+" checked item"+(n!==1?"s":""));
+}
+
 function dueTag(t){
   if(!t.due)return "";
   const tk=dayKey(),d=parseKey(t.due);
@@ -1146,15 +1224,15 @@ function tick(){
 /* ============================================================
    NAV + wiring
    ============================================================ */
-const VIEWS=["today","brief","recap","recurring","settings"];
+const VIEWS=["today","shopping","recap","recurring","settings"];
 function navTo(v,noNav){
   VIEWS.forEach(x=>$("#v-"+x).classList.toggle("active",x===v));
   $$(".nav button[data-nav]").forEach(b=>b.classList.toggle("on",b.dataset.nav===v));
-  $("#app").classList.toggle("brief-open",v==="brief"||v==="recap");
+  $("#app").classList.toggle("brief-open",v==="recap");
   $("#app").classList.toggle("today-open",v==="today");
   window.scrollTo(0,0);
   if(v==="today")render();
-  if(v==="brief"){renderBrief(); if(gcalConnected())gcalFetchToday();}
+  if(v==="shopping")renderShopping();
   if(v==="recurring")renderRecurring();
   if(v==="recap"&&!noNav)renderRecap(false);
 }
@@ -1243,7 +1321,7 @@ function wire(){
 
   // nav
   $$("[data-nav]").forEach(b=>b.onclick=()=>navTo(b.dataset.nav));
-  $("#startDay").onclick=startDay;
+  $("#clearShop").onclick=shopClearChecked;
   // the ＋ in the composer: if you've typed something, add it; otherwise open the full editor
   $("#fab").onclick=()=>{ if(qi.value.trim())commitQuick(); else openEdit(null); };
   $("#scrim").onclick=closeSheet;
@@ -1305,6 +1383,7 @@ function wire(){
 load();
 activeTab=S.settings.tab||"personal";
 activeFilter=S.settings.filter||"week";
+if(!Array.isArray(S.shopping))S.shopping=[];   // migrate older saves that predate the shopping list
 gcalRestore();   // re-use a still-valid Google Calendar token from a previous session
 gcalSilentRefresh();  // …and quietly renew it in the background if it's expiring — no popup
 // daily bring reset if a new day arrived while closed
