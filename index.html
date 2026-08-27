@@ -472,7 +472,10 @@ const MO=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec
 /* The "day" rolls over at 3 AM, not midnight (like the する hub) — Eric works late and wants
    a task done at 1 AM to count for the day he's ending. Shift back 3h before taking the date. */
 const DAY_RESET_HOUR=3;
-function dayKey(d=new Date()){const s=new Date(d.getTime()-DAY_RESET_HOUR*3600*1000);return s.getFullYear()+"-"+String(s.getMonth()+1).padStart(2,"0")+"-"+String(s.getDate()).padStart(2,"0");}
+// plain calendar Y-M-D of a Date (no 3 AM shift) — use for arithmetic on parseKey (midnight) dates
+function fmtCal(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
+// "which logical day is it" — rolls at 3 AM. For a real `new Date()`; NOT for parseKey (midnight) dates.
+function dayKey(d=new Date()){return fmtCal(new Date(d.getTime()-DAY_RESET_HOUR*3600*1000));}
 function parseKey(k){const[y,m,d]=k.split("-").map(Number);return new Date(y,m-1,d);}
 function addDays(d,n){const x=new Date(d);x.setDate(x.getDate()+n);return x;}
 function isWeekend(d=new Date()){const g=d.getDay();return g===0||g===6;}
@@ -771,10 +774,12 @@ function addTask(o){
   save();
 }
 function recurNext(due,freq){
+  // due is a calendar date string; add the interval and re-format WITHOUT the 3 AM shift
+  // (parseKey gives midnight, and dayKey would push midnight back into the previous day).
   const d=parseKey(due||dayKey());
-  if(freq==="daily")return dayKey(addDays(d,1));
-  if(freq==="weekly")return dayKey(addDays(d,7));
-  if(freq==="monthly"){const x=new Date(d);x.setMonth(x.getMonth()+1);return dayKey(x);}
+  if(freq==="daily")return fmtCal(addDays(d,1));
+  if(freq==="weekly")return fmtCal(addDays(d,7));
+  if(freq==="monthly"){const x=new Date(d);x.setMonth(x.getMonth()+1);return fmtCal(x);}
   return due;
 }
 function toggleTask(id){
