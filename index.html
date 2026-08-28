@@ -424,11 +424,12 @@
       <p class="synchint dim">Enter the <b>same code</b> as someone else and your <b>Shopping</b> lists link up — items, checks, and clears show on both, live. Only the shopping list is shared; your tasks stay private.</p>
     </div>
     <div class="field">
-      <label>Google Calendar (today's events in your Brief)</label>
+      <label>Google Calendar</label>
       <input type="text" id="setGcalClient" placeholder="OAuth Client ID (…apps.googleusercontent.com)" autocomplete="off" autocapitalize="off" spellcheck="false">
       <button class="ghostbtn" id="btnGcal" style="margin-top:9px;width:100%">Connect Google Calendar</button>
+      <button class="ghostbtn" id="btnGcalPause" style="margin-top:9px;width:100%" hidden>Pause calendar</button>
       <p class="synchint" id="gcalStatus">Off — showing sample events.</p>
-      <p class="synchint dim">Read-only. Paste the OAuth <b>Client ID</b> from your Google Cloud project, then tap Connect. One-time setup steps are in the app’s README.</p>
+      <p class="synchint dim">Read-only. Paste the OAuth <b>Client ID</b> from your Google Cloud project, then tap Connect. <b>Pause</b> stops it running on every open but keeps your setup, so Resume is one tap. One-time setup steps are in the app’s README.</p>
     </div>
     <button class="dangerbtn" id="wipe">Clear everything</button>
     <p class="qhint" style="text-align:center;margin-top:18px">Daybreak · saved on this device · cloud backup optional</p>
@@ -494,7 +495,7 @@ let activeFilter="week";    // date filter: all|today|tomorrow|week|month
 function seed(){
   const tk=dayKey();
   return {
-    settings:{name:"",dayReset:3,theme:"auto",tab:"personal",filter:"week",syncKey:"",shareCode:"",gcalClient:""},
+    settings:{name:"",dayReset:3,theme:"auto",tab:"personal",filter:"week",syncKey:"",shareCode:"",gcalClient:"",gcalPaused:false},
     updatedAt:0,   // 0 = never edited by a person; keeps a fresh seed from ever overwriting the cloud backup
     bring:[{id:uid(),label:"Laptop",done:false},{id:uid(),label:"Gym bag",done:false},
            {id:uid(),label:"Meds",done:false},{id:uid(),label:"Umbrella",done:false}],
@@ -587,11 +588,14 @@ const GCAL_TOK_LS="daybreak_gcal_tok";
 function gcalClientId(){ return ((S.settings&&S.settings.gcalClient)||"").trim(); }
 function gcalConfigured(){ return !!gcalClientId(); }
 function gcalConnected(){ return gcalConfigured() && !!gcalToken && Date.now()<gcalExp; }
+function gcalPaused(){ return !!(S.settings&&S.settings.gcalPaused); }   // paused = keep the setup, but don't load/fetch on boot
 function calEvents(){ return gcalConfigured() ? (liveCal||[]) : S.calendar; }
 function fmtClock(d){ let h=d.getHours(),m=d.getMinutes(); const ap=h>=12?"PM":"AM"; h=h%12||12; return h+(m?":"+String(m).padStart(2,"0"):"")+" "+ap; }
 function refreshGcalStatus(){
-  const btn=$("#btnGcal"); if(btn)btn.textContent=gcalConnected()?"Disconnect":"Connect Google Calendar";
+  const pb=$("#btnGcalPause"); if(pb){ pb.textContent=gcalPaused()?"Resume calendar":"Pause calendar"; pb.hidden=!gcalConfigured(); }
+  const btn=$("#btnGcal"); if(btn){ btn.textContent=gcalConnected()?"Disconnect":"Connect Google Calendar"; btn.disabled=gcalPaused(); btn.style.opacity=gcalPaused()?".5":""; }
   const el=$("#gcalStatus"); if(!el)return;
+  if(gcalPaused()){ el.textContent="Paused — your setup is saved; it won't run until you resume."; el.dataset.state=""; return; }
   if(gcalConnected()){ el.textContent="Connected ✓"+(liveCal?" · "+liveCal.length+" event"+(liveCal.length!==1?"s":"")+" today":""); el.dataset.state="on"; }
   else if(gcalConfigured()){ el.textContent="Ready — tap Connect."; el.dataset.state=""; }
   else { el.textContent="Off — showing sample events."; el.dataset.state=""; }
@@ -636,7 +640,7 @@ async function gcalConnect(){
 // On boot, quietly renew an expiring token with NO popup — works for as long as Google keeps the grant
 // (Testing-mode consent lapses ~weekly, after which a one-tap Connect is needed again).
 async function gcalSilentRefresh(){
-  if(!gcalConfigured())return;
+  if(!gcalConfigured()||gcalPaused())return;
   let seen=false; try{seen=localStorage.getItem(GCAL_ON_LS)==="1";}catch(e){}
   if(!seen)return;
   if(gcalToken&&Date.now()<gcalExp-120000){ if(gcalConnected())gcalFetchToday(); return; } // still fresh
@@ -1327,6 +1331,13 @@ function wire(){
     refreshGcalStatus();
   };
   $("#btnGcal").onclick=()=>{ gcalConnected()?gcalDisconnect():gcalConnect(); };
+  $("#btnGcalPause").onclick=()=>{
+    const pausing=!gcalPaused();
+    S.settings.gcalPaused=pausing; save();
+    if(pausing){ liveCal=null; }                         // stop using it; token + Client ID kept intact
+    else { gcalRestore(); gcalSilentRefresh(); }          // resume: re-arm quietly, no popup
+    refreshGcalStatus();
+  };
   $$("#themeSeg button").forEach(b=>b.onclick=()=>{S.settings.theme=b.dataset.theme;save();applyTheme();});
   $("#wipe").onclick=()=>{if(confirm("Clear everything and start empty?")){S=seed();S.tasks=[];S.log=[];S.bring=[];save();navTo("today");toast("Cleared");}};
 }
@@ -1338,8 +1349,11 @@ activeFilter=S.settings.filter||"week";
 if(!Array.isArray(S.shopping))S.shopping=[];   // migrate older saves that predate the shopping list
 if(typeof S.settings.dayReset!=="number")S.settings.dayReset=DAY_RESET_HOUR;   // backfill the day-reset hour
 if(typeof S.settings.shareCode!=="string")S.settings.shareCode="";   // backfill shared-list code
-gcalRestore();   // re-use a still-valid Google Calendar token from a previous session
-gcalSilentRefresh();  // …and quietly renew it in the background if it's expiring — no popup
+if(typeof S.settings.gcalPaused!=="boolean")S.settings.gcalPaused=false;   // backfill calendar pause flag
+if(!gcalPaused()){
+  gcalRestore();   // re-use a still-valid Google Calendar token from a previous session
+  gcalSilentRefresh();  // …and quietly renew it in the background if it's expiring — no popup
+}
 dayRollover(); // reset "before you leave" + re-arm recurring if a new day arrived while closed
 applyTheme();
 wire();
