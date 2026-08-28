@@ -230,31 +230,6 @@
     font-size:18px;cursor:pointer;flex:none;color:var(--ink)}
   .vhead h2{font-family:var(--font-display);font-weight:800;font-size:24px;letter-spacing:-.02em;margin:0}
 
-  /* ---------- morning brief ---------- */
-  .brief-hero{background:linear-gradient(160deg,var(--coral),var(--coral-deep));color:var(--on-coral);
-    border-radius:var(--r-card);padding:22px 20px;margin:6px 0 4px;position:relative;overflow:hidden}
-  .brief-hero::after{content:"☀";position:absolute;right:-14px;top:-20px;font-size:120px;opacity:.16}
-  .brief-hero .t{text-transform:uppercase;letter-spacing:.2em;font-size:11px;font-weight:800;opacity:.9}
-  .brief-hero h2{font-family:var(--font-display);font-weight:800;font-size:25px;margin:8px 0 4px;letter-spacing:-.02em}
-  .brief-hero p{margin:0;font-size:13.5px;opacity:.92;font-weight:500}
-  .bsec-h{font-family:var(--font-display);font-weight:700;font-size:14px;margin:22px 4px 10px;display:flex;align-items:center;gap:8px}
-  .bsec-h .num{background:var(--ground-2);color:var(--ink-soft);font-size:11px;padding:2px 8px;border-radius:99px;font-weight:800}
-  .brow{display:flex;align-items:center;gap:12px;padding:13px 15px;background:var(--surface);border:1px solid var(--line);
-    border-radius:var(--r-item);margin-bottom:9px}
-  .brow .bbody{flex:1;min-width:0}
-  .brow .bttl{font-weight:600;font-size:14.5px;word-break:break-word}
-  .brow .bsub{font-size:11.5px;color:var(--muted);font-weight:600;margin-top:2px}
-  .toggle{width:46px;height:27px;border-radius:99px;background:var(--coral);flex:none;position:relative;cursor:pointer;border:0;transition:.2s}
-  .toggle::after{content:"";position:absolute;top:3px;left:22px;width:21px;height:21px;border-radius:50%;background:#fff;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)}
-  .toggle.off{background:var(--ground-2)}
-  .toggle.off::after{left:3px}
-  .addbtn{flex:none;border:1.5px solid var(--coral);color:var(--coral);background:transparent;font-weight:700;font-size:13px;
-    padding:8px 15px;border-radius:99px;cursor:pointer;transition:.15s}
-  .addbtn.added{background:var(--coral);color:var(--on-coral)}
-  .startbtn{width:100%;margin:22px 0 8px;background:var(--teal);color:#fff;border:0;font-family:var(--font-display);font-weight:700;
-    font-size:16px;padding:16px;border-radius:var(--r-pill);cursor:pointer;box-shadow:0 8px 20px rgba(14,124,134,.35)}
-  .briefempty{text-align:center;color:var(--muted);padding:18px;font-size:13.5px;font-weight:500}
-
   /* ---------- shopping list ---------- */
   .clearchk{margin-left:auto;background:var(--danger-bg);color:var(--danger);border:0;border-radius:99px;
     padding:9px 15px;font-family:var(--font-body);font-weight:700;font-size:12.5px;cursor:pointer;flex:none}
@@ -296,7 +271,6 @@
   .recap .ln .c{width:18px;height:18px;border-radius:6px;background:var(--green);color:#fff;display:grid;place-items:center;font-size:11px;font-weight:800;flex:none}
   .recap .ln s{text-decoration:none;color:var(--ink-soft)}
   .recap .ln small{margin-left:auto;color:var(--muted);font-weight:600;font-size:11px}
-  .nightly{margin-top:18px;font-size:12px;color:var(--muted);font-weight:600;display:flex;align-items:center;gap:7px;justify-content:center}
   .egg{margin-top:8px;font-size:12px;color:var(--gold);font-weight:800}
 
   /* ---------- recurring / settings list ---------- */
@@ -426,9 +400,6 @@
   <section class="view" id="v-settings">
     <div class="vhead"><button class="back" data-nav="today">←</button><h2>Settings</h2></div>
     <div class="field"><label>Your name</label><input type="text" id="setName" placeholder="Your name"></div>
-    <div class="field"><label>Weekday wake time (morning brief)</label><input type="time" id="setWkday" value="06:45"></div>
-    <div class="field"><label>Weekend wake time</label><input type="time" id="setWkend" value="08:00"></div>
-    <div class="field"><label>Nightly recap</label><input type="time" id="setNight" value="23:00"></div>
     <div class="field"><label>New day starts at</label>
       <select id="setDayReset"></select>
       <p class="synchint dim">When your day rolls over. Anything done before this counts toward the day before — and “Before you leave” resets at this time.</p>
@@ -508,7 +479,6 @@ function fmtCal(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,
 function dayKey(d=new Date()){return fmtCal(new Date(d.getTime()-dayResetHour()*3600*1000));}
 function parseKey(k){const[y,m,d]=k.split("-").map(Number);return new Date(y,m-1,d);}
 function addDays(d,n){const x=new Date(d);x.setDate(x.getDate()+n);return x;}
-function isWeekend(d=new Date()){const g=d.getDay();return g===0||g===6;}
 
 /* ---- state ---- */
 let S;
@@ -517,7 +487,7 @@ let activeFilter="week";    // date filter: all|today|tomorrow|week|month
 function seed(){
   const tk=dayKey();
   return {
-    settings:{name:"",wkday:"06:45",wkend:"08:00",night:"23:00",dayReset:3,theme:"auto",tab:"personal",filter:"week",syncKey:"",gcalClient:""},
+    settings:{name:"",dayReset:3,theme:"auto",tab:"personal",filter:"week",syncKey:"",gcalClient:""},
     updatedAt:0,   // 0 = never edited by a person; keeps a fresh seed from ever overwriting the cloud backup
     bring:[{id:uid(),label:"Laptop",done:false},{id:uid(),label:"Gym bag",done:false},
            {id:uid(),label:"Meds",done:false},{id:uid(),label:"Umbrella",done:false}],
@@ -542,7 +512,6 @@ function seed(){
       {id:"c3",title:"Pick up dry cleaning",time:"5:30 PM",list:"personal"},
     ],
     log:[], // {title, at(ISO), day, list}
-    lastBriefDay:null,
     lastSeenDay:tk,
   };
 }
@@ -663,7 +632,6 @@ function gcalDisconnect(){
   gcalToken=null; gcalExp=0; liveCal=null;
   try{localStorage.removeItem(GCAL_TOK_LS);localStorage.removeItem(GCAL_ON_LS);}catch(e){}
   refreshGcalStatus();
-  if($("#v-brief")&&$("#v-brief").classList.contains("active"))renderBrief();
 }
 async function gcalShowErr(r){ // read Google's error body → friendly, actionable status line
   let reason="", detail="";
@@ -716,7 +684,6 @@ async function gcalFetchToday(){
     merged.sort((a,b)=>a._start-b._start);
     liveCal=merged.map(({_start,uid,...rest})=>rest);
     refreshGcalStatus();
-    if($("#v-brief")&&$("#v-brief").classList.contains("active"))renderBrief();
   }catch(e){ const el=$("#gcalStatus"); if(el){el.textContent="Couldn't reach Google Calendar.";el.dataset.state="err";} }
 }
 function gcalRestore(){ try{ const t=JSON.parse(localStorage.getItem(GCAL_TOK_LS)||"null"); if(t&&t.token&&Date.now()<t.exp){ gcalToken=t.token; gcalExp=t.exp; } }catch(e){} }
@@ -872,17 +839,6 @@ function streak(){
   if(!days.has(dayKey(d)))d=addDays(d,-1);
   while(days.has(dayKey(d))){n++;d=addDays(d,-1);}
   return n;
-}
-
-/* ---- rollover / brief availability ---- */
-function leftovers(){
-  const tk=dayKey();
-  return S.tasks.filter(t=>!t.done && !t.recur && t.day<tk);
-}
-function briefAvailable(){
-  const tk=dayKey();
-  if(S.lastBriefDay===tk)return false;
-  return true; // available once per day
 }
 
 /* ============================================================
@@ -1066,61 +1022,7 @@ function bindTasks(el){
 /* ============================================================
    BRIEF
    ============================================================ */
-let briefPicks;
-function renderBrief(){
-  const nm=S.settings.name||"there";
-  $("#briefHello").textContent="Good morning, "+nm;
-  const lo=leftovers(), cal=calEvents(), tk=dayKey();
-  const bills=S.tasks.filter(t=>t.recur&&!t.done&&t.due&&t.due<=dayKey(addDays(new Date(),5)));
-  $("#briefSum").textContent="Let's set up "+WD[parseKey(tk).getDay()]+". "+
-    lo.length+" leftover"+(lo.length!==1?"s":"")+", "+cal.length+" event"+(cal.length!==1?"s":"")+", "+bills.length+" bill"+(bills.length!==1?"s":"")+" due.";
-  briefPicks={carry:{},cal:{},bills:{}};
-  lo.forEach(t=>briefPicks.carry[t.id]=true);
-  bills.forEach(t=>briefPicks.bills[t.id]=true);
-
-  let h="";
-  if(lo.length){
-    h+='<div class="bsec-h"><span class="num">'+lo.length+'</span>Carry over from before?</div>';
-    lo.forEach(t=>{h+='<div class="brow"><div class="bbody"><div class="bttl">'+escapeHtml(t.title)+
-      '</div><div class="bsub">from '+niceDay(t.day)+' · not done</div></div>'+
-      '<button class="toggle" data-carry="'+t.id+'"></button></div>';});
-  }
-  if(cal.length){
-    h+='<div class="bsec-h"><span class="num">'+cal.length+'</span>From your calendar today</div>';
-    cal.forEach(c=>{h+='<div class="brow"><div class="bbody"><div class="bttl">'+escapeHtml(c.title)+
-      '</div><div class="bsub">'+escapeHtml(c.time)+' · '+escapeHtml(c.list)+'</div></div>'+
-      '<button class="addbtn" data-cal="'+escapeHtml(c.id)+'">＋ Add</button></div>';});
-  }else if(gcalConfigured()&&!gcalConnected()){
-    h+='<div class="bsec-h"><span class="num">↻</span>From your calendar today</div>';
-    h+='<div class="brow"><div class="bbody"><div class="bsub">Connect Google Calendar in Settings to see today’s events.</div></div></div>';
-  }
-  if(bills.length){
-    h+='<div class="bsec-h"><span class="num">'+bills.length+'</span>Recurring & bills due</div>';
-    bills.forEach(t=>{h+='<div class="brow"><div class="bbody"><div class="bttl">'+escapeHtml(t.title)+
-      '</div><div class="bsub">'+dueLabelPlain(t)+' · '+t.recur+'</div></div>'+
-      '<button class="toggle" data-bill="'+t.id+'"></button></div>';});
-  }
-  if(!lo.length&&!cal.length&&!bills.length)h='<div class="briefempty">Nothing to triage — a clean slate. Have a great day ☀️</div>';
-  $("#briefBody").innerHTML=h;
-
-  $$('[data-carry]').forEach(b=>b.onclick=()=>{const id=b.dataset.carry;briefPicks.carry[id]=!briefPicks.carry[id];b.classList.toggle("off",!briefPicks.carry[id]);});
-  $$('[data-bill]').forEach(b=>b.onclick=()=>{const id=b.dataset.bill;briefPicks.bills[id]=!briefPicks.bills[id];b.classList.toggle("off",!briefPicks.bills[id]);});
-  $$('[data-cal]').forEach(b=>b.onclick=()=>{const id=b.dataset.cal;briefPicks.cal[id]=!briefPicks.cal[id];b.classList.toggle("added",briefPicks.cal[id]);b.textContent=briefPicks.cal[id]?"✓ Added":"＋ Add";});
-}
 function niceDay(k){const d=parseKey(k);return WD[d.getDay()].slice(0,3)+" "+MO[d.getMonth()]+" "+d.getDate();}
-function dueLabelPlain(t){const diff=Math.round((parseKey(t.due)-parseKey(dayKey()))/86400000);
-  return diff<0?"overdue":diff===0?"due today":diff===1?"due tomorrow":"due in "+diff+" days";}
-function startDay(){
-  const tk=dayKey();
-  // carry overs
-  leftovers().forEach(t=>{if(briefPicks.carry[t.id]){t.day=tk;t.due=t.due&&t.due<tk?tk:t.due;}else{t.done=true;t.day=t.day;/* drop from today */ S.tasks=S.tasks.filter(x=>x.id!==t.id);}});
-  // calendar picks
-  calEvents().forEach(c=>{if(briefPicks.cal[c.id]){addTask({title:c.title,list:c.list,time:c.time,fromCal:true,due:tk,day:tk});}});
-  // reset bring list
-  S.bring.forEach(b=>b.done=false);S.bringReset=tk;
-  S.lastBriefDay=tk;save();
-  navTo("today");toast("Day set up ☀️");
-}
 
 /* ============================================================
    RECAP
@@ -1139,12 +1041,10 @@ function renderRecap(special){
     h+='<div class="ln"><span class="c">✓</span><s>'+escapeHtml(l.title)+'</s><small>'+((tm.getHours()%12)||12)+":"+String(tm.getMinutes()).padStart(2,"0")+(tm.getHours()<12?"am":"pm")+'</small></div>';});
   else h+='<div class="empty">—</div>';
   h+='</div>';
-  h+='<div class="nightly">🌙 Nightly recap arrives at '+fmtTime(S.settings.night)+'</div>';
   if(special)h+='<div class="egg">✨ Rare confetti unlocked — 1-in-25!</div>';
   h+='</div>';
   $("#recapBody").innerHTML=h;
 }
-function fmtTime(hhmm){if(!hhmm)return"11:00 PM";let[h,m]=hhmm.split(":").map(Number);const ap=h<12?"AM":"PM";return((h%12)||12)+":"+String(m).padStart(2,"0")+" "+ap;}
 function fmtHour(h){const ap=h<12?"AM":"PM";return((h%12)||12)+":00 "+ap+(h===0?" (midnight)":h===12?" (noon)":"");}
 
 /* ============================================================
@@ -1365,11 +1265,7 @@ function wire(){
 
   // settings
   $("#setName").value=S.settings.name;
-  $("#setWkday").value=S.settings.wkday;$("#setWkend").value=S.settings.wkend;$("#setNight").value=S.settings.night;
   $("#setName").oninput=e=>{S.settings.name=e.target.value;save();};
-  $("#setWkday").onchange=e=>{S.settings.wkday=e.target.value;save();};
-  $("#setWkend").onchange=e=>{S.settings.wkend=e.target.value;save();};
-  $("#setNight").onchange=e=>{S.settings.night=e.target.value;save();};
   // day-reset hour — offer 12 AM through 11 AM (the realistic range for a late-night "new day")
   const dr=$("#setDayReset");
   if(dr){
