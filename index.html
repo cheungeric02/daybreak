@@ -376,7 +376,6 @@
         <h3>🎒 Before you leave</h3>
         <button class="edit" id="editLeave">Edit</button>
       </div>
-      <p class="cap">Grab these on your way out — resets each morning</p>
       <div class="chips" id="leaveChips"></div>
     </div>
 
@@ -430,6 +429,10 @@
     <div class="field"><label>Weekday wake time (morning brief)</label><input type="time" id="setWkday" value="06:45"></div>
     <div class="field"><label>Weekend wake time</label><input type="time" id="setWkend" value="08:00"></div>
     <div class="field"><label>Nightly recap</label><input type="time" id="setNight" value="23:00"></div>
+    <div class="field"><label>New day starts at</label>
+      <select id="setDayReset"></select>
+      <p class="synchint dim">When your day rolls over. Anything done before this counts toward the day before — and “Before you leave” resets at this time.</p>
+    </div>
     <div class="field"><label>Theme</label>
       <div class="segrow" id="themeSeg">
         <button data-theme="auto" class="on">Auto</button>
@@ -494,13 +497,15 @@ const WD=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"
 const MO=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
 /* ---- date helpers (local time) ---- */
-/* The "day" rolls over at 3 AM, not midnight (like the する hub) — Eric works late and wants
-   a task done at 1 AM to count for the day he's ending. Shift back 3h before taking the date. */
-const DAY_RESET_HOUR=3;
-// plain calendar Y-M-D of a Date (no 3 AM shift) — use for arithmetic on parseKey (midnight) dates
+/* The "day" rolls over at a chosen hour, not midnight — Eric works late and wants a task done
+   at 1 AM to count for the day he's ending. Default 3 AM; changeable in Settings (S.settings.dayReset).
+   Shift back that many hours before taking the date. */
+const DAY_RESET_HOUR=3;   // fallback default when no per-user setting is stored
+function dayResetHour(){try{const h=S.settings.dayReset;if(typeof h==="number"&&h>=0&&h<=23)return h;}catch(e){}return DAY_RESET_HOUR;}
+// plain calendar Y-M-D of a Date (no reset shift) — use for arithmetic on parseKey (midnight) dates
 function fmtCal(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
-// "which logical day is it" — rolls at 3 AM. For a real `new Date()`; NOT for parseKey (midnight) dates.
-function dayKey(d=new Date()){return fmtCal(new Date(d.getTime()-DAY_RESET_HOUR*3600*1000));}
+// "which logical day is it" — rolls at the reset hour. For a real `new Date()`; NOT for parseKey (midnight) dates.
+function dayKey(d=new Date()){return fmtCal(new Date(d.getTime()-dayResetHour()*3600*1000));}
 function parseKey(k){const[y,m,d]=k.split("-").map(Number);return new Date(y,m-1,d);}
 function addDays(d,n){const x=new Date(d);x.setDate(x.getDate()+n);return x;}
 function isWeekend(d=new Date()){const g=d.getDay();return g===0||g===6;}
@@ -512,7 +517,7 @@ let activeFilter="week";    // date filter: all|today|tomorrow|week|month
 function seed(){
   const tk=dayKey();
   return {
-    settings:{name:"",wkday:"06:45",wkend:"08:00",night:"23:00",theme:"auto",tab:"personal",filter:"week",syncKey:"",gcalClient:""},
+    settings:{name:"",wkday:"06:45",wkend:"08:00",night:"23:00",dayReset:3,theme:"auto",tab:"personal",filter:"week",syncKey:"",gcalClient:""},
     updatedAt:0,   // 0 = never edited by a person; keeps a fresh seed from ever overwriting the cloud backup
     bring:[{id:uid(),label:"Laptop",done:false},{id:uid(),label:"Gym bag",done:false},
            {id:uid(),label:"Meds",done:false},{id:uid(),label:"Umbrella",done:false}],
@@ -839,6 +844,16 @@ function refreshRecurring(){
   });
   if(ch)save();
 }
+// When the logical day has advanced (rolls at the Settings reset hour), reset the daily bits.
+// Runs at boot AND whenever the app regains focus/visibility, so a PWA left open overnight still resets.
+function dayRollover(){
+  const tk=dayKey();let ch=false;
+  if(S.bringReset!==tk){S.bring.forEach(b=>b.done=false);S.bringReset=tk;ch=true;}
+  if(S.lastSeenDay!==tk){S.lastSeenDay=tk;ch=true;}
+  refreshRecurring();            // re-arm bills / chores whose next occurrence has arrived (saves itself)
+  if(ch)save();
+  if($("#v-today")&&$("#v-today").classList.contains("active"))render();
+}
 function afterComplete(id){
   const el=$('[data-id="'+id+'"]');if(el)el.classList.add("popped");
   if(pendingToday().length===0 && completedToday()>0) setTimeout(celebrate,220);
@@ -1130,6 +1145,7 @@ function renderRecap(special){
   $("#recapBody").innerHTML=h;
 }
 function fmtTime(hhmm){if(!hhmm)return"11:00 PM";let[h,m]=hhmm.split(":").map(Number);const ap=h<12?"AM":"PM";return((h%12)||12)+":"+String(m).padStart(2,"0")+" "+ap;}
+function fmtHour(h){const ap=h<12?"AM":"PM";return((h%12)||12)+":00 "+ap+(h===0?" (midnight)":h===12?" (noon)":"");}
 
 /* ============================================================
    EDIT / ADD SHEET
@@ -1276,14 +1292,12 @@ function toggleTheme(){S.settings.theme=effectiveDark()?"light":"dark";save();ap
 function wire(){
   // quick add (with ramble-tidy + choose-your-words)
   const qi=$("#qinput"),hint=$("#qhint");
-  const DEFAULT_HINT='Ramble it — “ok I really need to pay the Visa bill friday” → I’ll tidy it &nbsp;·&nbsp; tap 🎙 to speak';
   let useTidy=true,curParse=null;
   const showHint=html=>{hint.innerHTML=html;hint.classList.add("on");};
   const hideHint=()=>{hint.classList.remove("on","parsed");hint.innerHTML="";};
   function refreshHint(){
     const v=qi.value.trim();
-    if(v.length<2){curParse=null;hint.classList.remove("parsed");
-      if(document.activeElement===qi)showHint(DEFAULT_HINT);else hideHint();return;}
+    if(v.length<2){curParse=null;hint.classList.remove("parsed");hideHint();return;}
     curParse=parseInput(v);const p=curParse;hint.classList.add("parsed");
     if(p.differs){
       const shown=useTidy?p.tidy:p.original;
@@ -1295,7 +1309,6 @@ function wire(){
     }
   }
   qi.addEventListener("input",()=>{useTidy=true;refreshHint();});
-  qi.addEventListener("focus",()=>{if(qi.value.trim().length<2)showHint(DEFAULT_HINT);});
   qi.addEventListener("blur",()=>{setTimeout(()=>{if(qi.value.trim().length<2&&document.activeElement!==qi)hideHint();},160);});
   qi.addEventListener("keydown",e=>{if(e.key==="Enter")commitQuick();});
   function commitQuick(){
@@ -1306,7 +1319,7 @@ function wire(){
     addTask({title,list,pri:p.pri,due:p.due,bill:p.bill,recur:p.recur,time:p.time,day:dayKey()});
     qi.value="";curParse=null;useTidy=true;hint.classList.remove("parsed");showHint("Added ✓ — "+escapeHtml(title));
     render();qi.focus();
-    setTimeout(()=>{if(!qi.value.trim()){if(document.activeElement===qi)showHint(DEFAULT_HINT);else hideHint();}},1800);
+    setTimeout(()=>{if(!qi.value.trim())hideHint();},1800);
   }
 
   // voice — fills the box so you can review the tidy + choose before adding
@@ -1357,6 +1370,14 @@ function wire(){
   $("#setWkday").onchange=e=>{S.settings.wkday=e.target.value;save();};
   $("#setWkend").onchange=e=>{S.settings.wkend=e.target.value;save();};
   $("#setNight").onchange=e=>{S.settings.night=e.target.value;save();};
+  // day-reset hour — offer 12 AM through 11 AM (the realistic range for a late-night "new day")
+  const dr=$("#setDayReset");
+  if(dr){
+    dr.innerHTML="";
+    for(let h=0;h<=11;h++){const o=document.createElement("option");o.value=String(h);o.textContent=fmtHour(h);dr.appendChild(o);}
+    dr.value=String(typeof S.settings.dayReset==="number"?S.settings.dayReset:DAY_RESET_HOUR);
+    dr.onchange=e=>{S.settings.dayReset=parseInt(e.target.value,10);save();dayRollover();render();};
+  }
   // cloud backup & sync key
   $("#setSyncKey").value=(S.settings.syncKey)||"";
   $("#setSyncKey").onchange=e=>{
@@ -1384,16 +1405,18 @@ load();
 activeTab=S.settings.tab||"personal";
 activeFilter=S.settings.filter||"week";
 if(!Array.isArray(S.shopping))S.shopping=[];   // migrate older saves that predate the shopping list
+if(typeof S.settings.dayReset!=="number")S.settings.dayReset=DAY_RESET_HOUR;   // backfill the day-reset hour
 gcalRestore();   // re-use a still-valid Google Calendar token from a previous session
 gcalSilentRefresh();  // …and quietly renew it in the background if it's expiring — no popup
-// daily bring reset if a new day arrived while closed
-if(S.bringReset!==dayKey()){S.bring.forEach(b=>b.done=false);S.bringReset=dayKey();save();}
-refreshRecurring(); // re-arm bills / する / chores whose next occurrence has arrived
-S.lastSeenDay=dayKey();save();
+dayRollover(); // reset "before you leave" + re-arm recurring if a new day arrived while closed
 applyTheme();
 wire();
 navTo("today");
 booting=false;   // from here on, save() stamps updatedAt and pushes to the cloud
+
+// Re-check the day boundary whenever the app comes back to the foreground (installed PWAs stay in memory for days).
+document.addEventListener("visibilitychange",()=>{if(!document.hidden)dayRollover();});
+window.addEventListener("focus",dayRollover);
 
 /* Ask the browser not to auto-evict our data under storage pressure (installed PWAs are usually granted this). */
 if(navigator.storage&&navigator.storage.persist){navigator.storage.persist().catch(()=>{});}
