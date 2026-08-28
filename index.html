@@ -418,6 +418,12 @@
       <p class="synchint dim">This key is also your <b>recovery key</b>: enter the same one on a new phone (or after clearing data) to restore everything. Keep it private — anyone with it can see your list.</p>
     </div>
     <div class="field">
+      <label>Shared shopping list</label>
+      <input type="text" id="setShareCode" placeholder="Choose a shared code…" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <p class="synchint" id="shareStatus">Off — your shopping list is private to you.</p>
+      <p class="synchint dim">Enter the <b>same code</b> as someone else and your <b>Shopping</b> lists link up — items, checks, and clears show on both, live. Only the shopping list is shared; your tasks stay private.</p>
+    </div>
+    <div class="field">
       <label>Google Calendar (today's events in your Brief)</label>
       <input type="text" id="setGcalClient" placeholder="OAuth Client ID (…apps.googleusercontent.com)" autocomplete="off" autocapitalize="off" spellcheck="false">
       <button class="ghostbtn" id="btnGcal" style="margin-top:9px;width:100%">Connect Google Calendar</button>
@@ -460,6 +466,7 @@
    ============================================================ */
 const KEY="daybreak.v1";
 const SYNCKEY_LS="daybreak_synckey";   // where the user's private sync key is remembered
+const SHARECODE_LS="daybreak_sharecode";  // shared-shopping-list code (matches a partner's to link lists)
 let booting=true;                      // while true, save() won't stamp updatedAt (keeps fresh reinstalls from clobbering the cloud)
 const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
@@ -487,7 +494,7 @@ let activeFilter="week";    // date filter: all|today|tomorrow|week|month
 function seed(){
   const tk=dayKey();
   return {
-    settings:{name:"",dayReset:3,theme:"auto",tab:"personal",filter:"week",syncKey:"",gcalClient:""},
+    settings:{name:"",dayReset:3,theme:"auto",tab:"personal",filter:"week",syncKey:"",shareCode:"",gcalClient:""},
     updatedAt:0,   // 0 = never edited by a person; keeps a fresh seed from ever overwriting the cloud backup
     bring:[{id:uid(),label:"Laptop",done:false},{id:uid(),label:"Gym bag",done:false},
            {id:uid(),label:"Meds",done:false},{id:uid(),label:"Umbrella",done:false}],
@@ -541,6 +548,7 @@ window.__dbApplyRemote=obj=>{                        // a copy arrived from the 
   const rt=obj.updatedAt||0, lt=(S&&S.updatedAt)||0;
   if(rt>=lt){                                        // cloud is newer (or equal) → adopt it
     S=obj;
+    if(sharedShop!==null)S.shopping=sharedShop.slice();   // the shared shopping list stays the authority when linked
     saveLocalOnly();
     activeTab=(S.settings&&S.settings.tab)||activeTab;
     activeFilter=(S.settings&&S.settings.filter)||activeFilter;
@@ -548,6 +556,18 @@ window.__dbApplyRemote=obj=>{                        // a copy arrived from the 
   }else{                                             // local is newer (offline edits) → push it up
     if(window.__dbCloud)window.__dbCloud.push(S);
   }
+};
+
+/* ---- shared shopping list (talks to the Firebase module; separate from the personal blob) ----
+   When a partner code is set, the shopping list lives in a shared cloud node keyed by that code,
+   so both people read and write the same items in real time. `sharedShop` mirrors it (null = not linked). */
+let sharedShop=null;
+function shopShared(){return sharedShop!==null&&!!(window.__dbShared&&window.__dbShared.connected);}
+window.__dbSharedSeed=()=>Array.isArray(S.shopping)?S.shopping:[];   // used to seed an empty shared list from this device
+window.__dbSharedApply=arr=>{                        // the shared list changed (or unlinked with null)
+  sharedShop = arr===null?null:arr;
+  if(arr!==null){ S.shopping=arr.slice(); saveLocalOnly(); }   // adopt without stamping/pushing the personal blob
+  try{if($("#v-shopping")&&$("#v-shopping").classList.contains("active"))renderShopping();}catch(e){}
 };
 window.__dbCloudStatus=(msg,state)=>{
   const el=document.getElementById("syncStatus");
@@ -927,13 +947,19 @@ function renderShopping(){
 }
 function shopAdd(cat,name){
   name=(name||"").trim();if(!name)return;
-  S.shopping.push({id:uid(),name,cat:cat==="costco"?"costco":"general",done:false});
-  save();renderShopping();
+  const item={id:uid(),name,cat:cat==="costco"?"costco":"general",done:false,at:Date.now()};
+  if(shopShared()){window.__dbShared.addItem(item);return;}   // shared: write to cloud; onValue re-renders for both
+  S.shopping.push(item);save();renderShopping();
 }
-function shopToggle(id){const i=S.shopping.find(x=>x.id===id);if(!i)return;i.done=!i.done;save();renderShopping();}
-function shopRemove(id){S.shopping=S.shopping.filter(x=>x.id!==id);save();renderShopping();}
+function shopToggle(id){const i=S.shopping.find(x=>x.id===id);if(!i)return;
+  if(shopShared()){window.__dbShared.updateItem(id,{done:!i.done});return;}
+  i.done=!i.done;save();renderShopping();}
+function shopRemove(id){
+  if(shopShared()){window.__dbShared.removeItem(id);return;}
+  S.shopping=S.shopping.filter(x=>x.id!==id);save();renderShopping();}
 function shopClearChecked(){
-  const n=S.shopping.filter(i=>i.done).length;if(!n)return;
+  const doneItems=S.shopping.filter(i=>i.done);const n=doneItems.length;if(!n)return;
+  if(shopShared()){window.__dbShared.removeItems(doneItems.map(i=>i.id));toast("Cleared "+n+" checked item"+(n!==1?"s":""));return;}
   S.shopping=S.shopping.filter(i=>!i.done);save();renderShopping();
   toast("Cleared "+n+" checked item"+(n!==1?"s":""));
 }
@@ -1283,6 +1309,15 @@ function wire(){
     if(window.__dbCloud){ k?window.__dbCloud.connect(k):window.__dbCloud.disconnect(); }
     else if(!k){ const el=$("#syncStatus"); if(el){el.textContent="Off — your list is saved on this device only.";el.dataset.state="";} }
   };
+  // shared shopping list code
+  $("#setShareCode").value=(S.settings.shareCode)||"";
+  $("#setShareCode").onchange=e=>{
+    const c=e.target.value.trim();
+    S.settings.shareCode=c;save();
+    try{c?localStorage.setItem(SHARECODE_LS,c):localStorage.removeItem(SHARECODE_LS);}catch(_){}
+    if(window.__dbShared){ c?window.__dbShared.connect(c):window.__dbShared.disconnect(); }
+    else { const el=$("#shareStatus"); if(el){el.textContent=c?"Cloud unavailable here — can't link the shared list.":"Off — your shopping list is private to you.";el.dataset.state=c?"err":"";} }
+  };
   // Google Calendar
   $("#setGcalClient").value=(S.settings.gcalClient)||"";
   refreshGcalStatus();
@@ -1302,6 +1337,7 @@ activeTab=S.settings.tab||"personal";
 activeFilter=S.settings.filter||"week";
 if(!Array.isArray(S.shopping))S.shopping=[];   // migrate older saves that predate the shopping list
 if(typeof S.settings.dayReset!=="number")S.settings.dayReset=DAY_RESET_HOUR;   // backfill the day-reset hour
+if(typeof S.settings.shareCode!=="string")S.settings.shareCode="";   // backfill shared-list code
 gcalRestore();   // re-use a still-valid Google Calendar token from a previous session
 gcalSilentRefresh();  // …and quietly renew it in the background if it's expiring — no popup
 dayRollover(); // reset "before you leave" + re-arm recurring if a new day arrived while closed
@@ -1328,7 +1364,7 @@ if("serviceWorker" in navigator){
      Whole-state blob, newest-wins by updatedAt. No account needed — the private key namespaces (and gates) the data. -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
-  import { getDatabase, ref, onValue, set, off } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
+  import { getDatabase, ref, onValue, set, off, update, remove } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
   const firebaseConfig = {
     apiKey: "AIzaSyD9AJbPC9M4gpTyvfIoRcqILq0ZOom1OBs",
     authDomain: "bon-echo-bd946.firebaseapp.com",
@@ -1370,9 +1406,51 @@ if("serviceWorker" in navigator){
         set(curRef,s).catch(e=>{ status("Cloud sync error — check the database rules in Firebase.","err"); console.warn("[Daybreak] DB write error:",e); });
       }
     };
+
+    /* ---- shared shopping list ---- key it under daybreak/shared/<code>/items as a per-item map,
+       so two people with the same code edit the same list and concurrent edits to different items don't clobber. */
+    const shareStat=(m,s)=>{ const el=document.getElementById("shareStatus"); if(el){ el.textContent=m; el.dataset.state=s||""; } };
+    let shareRef=null, shareBase="";
+    window.__dbShared={
+      ready:true, connected:false,
+      connect(code){
+        const safe=sanitize(code); if(!safe){ shareStat("Enter a shared code to link lists.","err"); return; }
+        if(shareRef) off(shareRef);
+        shareBase="daybreak/shared/"+safe+"/items"; shareRef=ref(db,shareBase); this.connected=true; shareStat("Linking…","");
+        onValue(shareRef, snap=>{
+          this.connected=true;
+          const val=snap.val();
+          if(val){
+            const arr=Object.keys(val).map(id=>{ const it=val[id]||{}; return {id,name:it.name||"",cat:it.cat==="costco"?"costco":"general",done:!!it.done,at:it.at||0}; });
+            arr.sort((a,b)=>(a.at-b.at)||(a.id<b.id?-1:a.id>b.id?1:0));
+            shareStat("Shared list linked ✓ ("+arr.length+" item"+(arr.length!==1?"s":"")+")","on");
+            if(window.__dbSharedApply) window.__dbSharedApply(arr);
+          }else{
+            // empty shared list — seed it from this device's current items, else just show it empty
+            const seed=window.__dbSharedSeed?window.__dbSharedSeed():[];
+            if(seed&&seed.length){
+              const updates={}; seed.forEach((it,i)=>{ updates[it.id]={name:it.name,cat:it.cat==="costco"?"costco":"general",done:!!it.done,at:it.at||(Date.now()+i)}; });
+              update(shareRef,updates).catch(e=>{ shareStat("Shared list error — check Firebase rules.","err"); console.warn("[Daybreak] shared seed error:",e); });
+            }else{
+              shareStat("Shared list linked ✓ (empty)","on");
+              if(window.__dbSharedApply) window.__dbSharedApply([]);
+            }
+          }
+        }, err=>{ this.connected=false; shareStat("Shared list error — check Firebase rules.","err"); console.warn("[Daybreak] shared read error:",err); });
+      },
+      disconnect(){ if(shareRef) off(shareRef); shareRef=null; shareBase=""; this.connected=false; shareStat("Off — your shopping list is private to you.",""); if(window.__dbSharedApply) window.__dbSharedApply(null); },
+      addItem(it){ if(!this.connected||!shareBase||!it||!it.id) return; set(ref(db,shareBase+"/"+it.id),{name:it.name,cat:it.cat==="costco"?"costco":"general",done:!!it.done,at:it.at||Date.now()}).catch(e=>console.warn("[Daybreak] shared add error:",e)); },
+      updateItem(id,patch){ if(!this.connected||!shareBase||!id||!patch) return; update(ref(db,shareBase+"/"+id),patch).catch(e=>console.warn("[Daybreak] shared update error:",e)); },
+      removeItem(id){ if(!this.connected||!shareBase||!id) return; remove(ref(db,shareBase+"/"+id)).catch(e=>console.warn("[Daybreak] shared remove error:",e)); },
+      removeItems(ids){ if(!this.connected||!shareBase||!ids||!ids.length) return; const updates={}; ids.forEach(id=>{ updates[id]=null; }); update(ref(db,shareBase),updates).catch(e=>console.warn("[Daybreak] shared clear error:",e)); }
+    };
+
     let saved=""; try{ saved=localStorage.getItem("daybreak_synckey")||""; }catch(e){}
     if(saved) window.__dbCloud.connect(saved);
     else status("Off — your list is saved on this device only.","");
+    let sc=""; try{ sc=localStorage.getItem("daybreak_sharecode")||""; }catch(e){}
+    if(sc) window.__dbShared.connect(sc);
+    else shareStat("Off — your shopping list is private to you.","");
   }catch(e){ console.error("[Daybreak] Firebase init failed:",e); status("Cloud backup couldn't start here.","err"); }
 </script>
 
