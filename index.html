@@ -316,10 +316,6 @@
     z-index:95;opacity:0;transition:.25s;pointer-events:none;box-shadow:var(--shadow-lg);max-width:calc(100% - 28px)}
   .toast.show{opacity:1;transform:translateX(-50%) translateY(-6px)}
   .toast{display:inline-flex;align-items:center;gap:2px}
-  .toast.undoable{pointer-events:auto;cursor:pointer;padding:9px 9px 9px 18px}
-  .toast .tundo{margin-left:12px;background:var(--coral);color:var(--on-coral);border:0;font-family:inherit;
-    font-weight:800;font-size:13.5px;padding:10px 18px;border-radius:99px;cursor:pointer;flex:none;pointer-events:auto}
-  .toast .tundo:active{transform:scale(.94)}
 
   @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
@@ -813,12 +809,11 @@ function toggleTask(id){
   const t=S.tasks.find(x=>x.id===id);if(!t)return;
   const tk=dayKey();
   if(!t.done){
-    pushUndo();
     t.done=true;t.doneAt=new Date().toISOString();t.doneDay=tk;
     S.log.push({title:t.title,at:t.doneAt,day:tk,list:t.list});
     if(t.recur)t.due=recurNext(t.due||tk,t.recur); // checked off now; schedule next occurrence
     save();render();
-    toast(t.recur?"Done ✓ — comes back "+t.recur:"Done ✓",doUndo);
+    toast(t.recur?"Done ✓ — comes back "+t.recur:"Done ✓");
     afterComplete(id);
   }else{
     t.done=false;delete t.doneAt;delete t.doneDay;
@@ -1112,7 +1107,7 @@ function openEdit(id){
     else addTask({title,list:cur.list,due:(recur&&!due?dayKey():due),recur,pri:cur.pri,bill:cur.bill,day:dayKey()});
     save();closeSheet();render();if($("#v-recurring").classList.contains("active"))renderRecurring();
   };
-  if(t)$("#eDel").onclick=()=>{pushUndo();S.tasks=S.tasks.filter(x=>x.id!==id);save();closeSheet();render();if($("#v-recurring").classList.contains("active"))renderRecurring();toast("Deleted",doUndo);};
+  if(t)$("#eDel").onclick=()=>{S.tasks=S.tasks.filter(x=>x.id!==id);save();closeSheet();render();if($("#v-recurring").classList.contains("active"))renderRecurring();toast("Deleted");};
 }
 
 /* ============================================================
@@ -1127,7 +1122,7 @@ function renderRecurring(){
     '<button class="del" data-del="'+t.id+'">🗑</button></div>').join("")
     :'<div class="empty">No recurring items yet</div>';
   $$('[data-edit]',el).forEach(b=>b.onclick=()=>openEdit(b.dataset.edit));
-  $$('[data-del]',el).forEach(b=>b.onclick=()=>{pushUndo();S.tasks=S.tasks.filter(x=>x.id!==b.dataset.del);save();renderRecurring();render();toast("Deleted",doUndo);});
+  $$('[data-del]',el).forEach(b=>b.onclick=()=>{S.tasks=S.tasks.filter(x=>x.id!==b.dataset.del);save();renderRecurring();render();toast("Deleted");});
 }
 
 /* ============================================================
@@ -1182,28 +1177,11 @@ function navTo(v,noNav){
   if(v==="recurring")renderRecurring();
   if(v==="recap"&&!noNav)renderRecap(false);
 }
-function toast(msg,undoFn){
+function toast(msg){
   const t=$("#toast");clearTimeout(t._t);
-  t.classList.toggle("undoable",!!undoFn);
-  if(undoFn){
-    const fire=e=>{ if(e){e.preventDefault();e.stopPropagation();} clearTimeout(t._t); t.classList.remove("show"); t.onclick=null; undoFn(); };
-    t.innerHTML='<span>'+escapeHtml(msg)+'</span><button class="tundo">Undo</button>';
-    t.querySelector(".tundo").onclick=fire;
-    t.onclick=fire;                 // whole pill is tappable, not just the small button
-  }else{t.textContent=msg;t.onclick=null;}
+  t.textContent=msg;
   t.classList.add("show");
-  t._t=setTimeout(()=>{t.classList.remove("show");t.onclick=null;},undoFn?7000:1900);
-}
-
-/* ---- undo (snapshot the whole state before an easily-mis-tapped action) ---- */
-let undoSnap=null;
-function pushUndo(){undoSnap=JSON.stringify(S);}
-function doUndo(){
-  if(!undoSnap)return;
-  S=JSON.parse(undoSnap);undoSnap=null;save();applyTheme();
-  const cur=VIEWS.find(v=>$("#v-"+v).classList.contains("active"))||"today";
-  navTo(cur==="recap"?"today":cur); // a restored task means the "all clear" recap is stale
-  toast("Restored ↩");
+  t._t=setTimeout(()=>{t.classList.remove("show");},1900);
 }
 
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
