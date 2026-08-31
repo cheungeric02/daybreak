@@ -66,6 +66,8 @@
     padding:0 16px calc(112px + env(safe-area-inset-bottom));}
   .app.today-open{padding-bottom:calc(172px + env(safe-area-inset-bottom))} /* clear docked composer + nav */
   .app.brief-open,.app.recap-open{padding-bottom:24px}
+  /* wrapper is invisible to layout on phones; the desktop media query turns it into the Today grid's left column */
+  .today-main{display:contents}
 
   /* ---------- greeting ---------- */
   .greet{padding:calc(18px + env(safe-area-inset-top)) 4px 4px}
@@ -317,6 +319,103 @@
   .toast.show{opacity:1;transform:translateX(-50%) translateY(-6px)}
   .toast{display:inline-flex;align-items:center;gap:2px}
 
+  /* ============================================================
+     DESKTOP LAYOUT (≥960px) — reshapes the phone-first UI into a
+     sidebar + centered content column. Pure CSS; no JS changes.
+     Constants: sidebar 248px, content max 1040px (half = 520),
+     so half-sidebar = 124px. Content is centered in the space to
+     the right of the sidebar; the composer + toast share that centre.
+     ============================================================ */
+  @media (min-width:960px){
+    /* --- nav becomes a fixed left sidebar --- */
+    .nav{
+      flex-direction:column;justify-content:flex-start;align-items:stretch;
+      left:0;top:0;bottom:0;transform:none;width:248px;
+      border:0;border-right:1px solid var(--line);border-radius:0;
+      padding:26px 16px;gap:5px;box-shadow:none;background:var(--surface);
+    }
+    .nav::before{
+      content:"☀ Daybreak";font-family:var(--font-display);font-weight:800;
+      font-size:21px;letter-spacing:-.02em;color:var(--ink);
+      padding:4px 12px 20px;white-space:nowrap;
+    }
+    .nav button{
+      flex-direction:row;justify-content:flex-start;align-items:center;gap:14px;
+      width:100%;padding:12px 14px;border-radius:14px;font-size:14.5px;font-weight:700;
+      color:var(--ink-soft);transition:background .15s,color .15s;
+    }
+    .nav button .ico{font-size:20px;width:24px;text-align:center}
+    .nav button:hover{background:var(--ground-2);color:var(--ink)}
+    .nav button.on{background:var(--surface-tonal);color:var(--coral-deep)}
+
+    /* --- content column: offset past the sidebar, centred on wide screens --- */
+    .app,.app.today-open,.app.brief-open,.app.recap-open{
+      max-width:1040px;
+      margin-left:max(248px,calc(50% - 396px));margin-right:0;
+      padding:0 clamp(28px,4vw,56px) 56px;
+    }
+    .app.today-open{padding-bottom:128px} /* clear the floating composer */
+
+    /* --- Today: two columns (tasks | sticky "before you leave" rail) --- */
+    #v-today.active{
+      display:grid;grid-template-columns:minmax(0,1fr) 280px;
+      grid-template-areas:"greet greet" "main rail";
+      column-gap:40px;align-items:start;
+    }
+    #v-today > .greet{grid-area:greet}
+    #v-today > .today-main{grid-area:main;display:block;min-width:0}
+    #v-today > #leave{grid-area:rail;margin:0;position:sticky;top:24px;align-self:start}
+    .today-main > .ltabs{margin-top:4px}
+
+    /* type scale bump */
+    .greet{padding-top:36px}
+    .greet .hello{font-size:31px}
+    .vhead{padding-top:36px}
+    .vhead h2{font-size:29px}
+
+    /* --- Shopping: two category columns --- */
+    #v-shopping.active #shopBody{display:grid;grid-template-columns:1fr 1fr;gap:26px 30px;align-items:start}
+    #v-shopping.active #shopBody .sec{margin-top:0}
+
+    /* narrower, centred column for form/reading views */
+    #v-settings.active,#v-recurring.active,#v-recap.active{max-width:660px;margin-inline:auto}
+
+    /* --- composer: a floating command bar centred in the content region --- */
+    .dock{left:calc(50% + 124px);transform:translateX(-50%);bottom:26px;width:auto}
+    .app.today-open .dock{display:flex;flex-direction:column;align-items:center}
+    .dock .qadd{width:min(560px,calc(100vw - 320px));box-shadow:var(--shadow-lg)}
+    .dock .qhint{text-align:center;margin:0 0 7px}
+
+    /* toast rides above the composer, same centre */
+    .toast{left:calc(50% + 124px);bottom:104px}
+
+    /* --- editor: a centred modal instead of a bottom sheet --- */
+    .sheet{
+      top:50%;bottom:auto;left:50%;right:auto;margin:0;
+      width:min(560px,92vw);max-width:560px;max-height:86vh;
+      border-radius:24px;padding:24px 28px calc(28px + env(safe-area-inset-bottom));
+      transform:translate(-50%,-47%) scale(.985);opacity:0;
+      transition:transform .28s cubic-bezier(.2,.8,.2,1),opacity .2s ease;
+    }
+    .sheet.show{transform:translate(-50%,-50%) scale(1);opacity:1}
+    .sheet .grab{display:none}
+    .sheet h3{font-size:22px;margin-top:4px}
+
+    /* --- hover affordances (desktop has a pointer) --- */
+    .task:hover{background:var(--ground-2)}
+    .sitem:hover{background:var(--ground-2)}
+    .chip:hover{border-color:var(--muted)}
+    .fchip:hover:not(.on){background:var(--ground-2)}
+    .ltab:hover:not(.on){background:var(--ground-2)}
+    .lrow .lb.tap:hover{background:var(--surface-tonal)}
+    .tglbtn:hover,.streak:hover,.srm:hover,.del:hover{filter:brightness(.97)}
+    .segrow button:hover:not(.on){background:var(--ground-2)}
+    .savebtn:hover,.shopplus:hover,.qadd .plus:hover{filter:brightness(1.05)}
+    .ghostbtn:hover{border-color:var(--muted);color:var(--ink-soft)}
+    .dangerbtn:hover{background:var(--danger-bg)}
+    .clearchk:hover{filter:brightness(.97)}
+  }
+
   @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -349,24 +448,27 @@
       <div class="chips" id="leaveChips"></div>
     </div>
 
-    <div class="ltabs" id="listTabs">
-      <button class="ltab on" data-tab="personal"><span class="dot" style="background:var(--coral)"></span>Personal <em id="cPersonal">0</em></button>
-      <button class="ltab" data-tab="work"><span class="dot" style="background:var(--teal)"></span>Work <em id="cWork">0</em></button>
+    <!-- .today-main: display:contents on mobile (no layout effect); on desktop it becomes the left column of a 2-col grid -->
+    <div class="today-main">
+      <div class="ltabs" id="listTabs">
+        <button class="ltab on" data-tab="personal"><span class="dot" style="background:var(--coral)"></span>Personal <em id="cPersonal">0</em></button>
+        <button class="ltab" data-tab="work"><span class="dot" style="background:var(--teal)"></span>Work <em id="cWork">0</em></button>
+      </div>
+
+      <div class="filters" id="filters">
+        <button class="fchip fchip-odue" data-filter="overdue" hidden>⚠ Overdue</button>
+        <button class="fchip" data-filter="all">All</button>
+        <button class="fchip" data-filter="today">Today</button>
+        <button class="fchip" data-filter="tomorrow">Tomorrow</button>
+        <button class="fchip on" data-filter="week">This week</button>
+        <button class="fchip" data-filter="month">This month</button>
+      </div>
+
+      <div class="card" id="listActive"></div>
+
+      <div class="donehd collapsed" id="doneHd"><span>✓ Done today (<span id="doneN">0</span>)</span><span class="chev">▾</span></div>
+      <div class="donewrap collapsed" id="doneWrap"><div class="card" id="listDone"></div></div>
     </div>
-
-    <div class="filters" id="filters">
-      <button class="fchip fchip-odue" data-filter="overdue" hidden>⚠ Overdue</button>
-      <button class="fchip" data-filter="all">All</button>
-      <button class="fchip" data-filter="today">Today</button>
-      <button class="fchip" data-filter="tomorrow">Tomorrow</button>
-      <button class="fchip on" data-filter="week">This week</button>
-      <button class="fchip" data-filter="month">This month</button>
-    </div>
-
-    <div class="card" id="listActive"></div>
-
-    <div class="donehd collapsed" id="doneHd"><span>✓ Done today (<span id="doneN">0</span>)</span><span class="chev">▾</span></div>
-    <div class="donewrap collapsed" id="doneWrap"><div class="card" id="listDone"></div></div>
   </section>
 
   <!-- ===== SHOPPING LIST ===== -->
