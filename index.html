@@ -1388,7 +1388,10 @@ function wire(){
   $("#setSyncKey").value=(S.settings.syncKey)||"";
   $("#setSyncKey").onchange=e=>{
     const k=e.target.value.trim();
-    S.settings.syncKey=k;save();
+    // Setting the sync/recovery key is NOT a content edit — persist it WITHOUT stamping updatedAt.
+    // (save() would bump updatedAt=now; a fresh/reset seed would then out-rank the real cloud backup
+    //  and overwrite it on connect. saveLocalOnly keeps a pristine seed at updatedAt:0 so the cloud wins.)
+    S.settings.syncKey=k;saveLocalOnly();
     try{k?localStorage.setItem(SYNCKEY_LS,k):localStorage.removeItem(SYNCKEY_LS);}catch(_){}
     if(window.__dbCloud){ k?window.__dbCloud.connect(k):window.__dbCloud.disconnect(); }
     else if(!k){ const el=$("#syncStatus"); if(el){el.textContent="Off — your list is saved on this device only.";el.dataset.state="";} }
