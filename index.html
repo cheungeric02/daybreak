@@ -299,6 +299,10 @@
     font-weight:700;font-size:14px;cursor:pointer;margin-top:14px}
   .dangerbtn{width:100%;padding:13px;border-radius:var(--r-pill);border:1px solid var(--danger);background:transparent;color:var(--danger);
     font-weight:700;font-size:14px;cursor:pointer;margin-top:10px}
+  .bk-restore{flex:none;padding:8px 15px;border-radius:var(--r-pill);border:1px solid var(--line);background:var(--surface);
+    color:var(--ink-soft);font-family:var(--font-body);font-weight:700;font-size:13px;cursor:pointer;transition:background .15s}
+  .bk-restore:active{background:var(--surface-tonal)}
+  .bk-empty{padding:22px 8px;text-align:center;color:var(--muted);font-weight:600;font-size:14px;line-height:1.5}
 
   /* ---------- sheet ---------- */
   .scrim{position:fixed;inset:0;background:rgba(10,15,14,.5);z-index:60;opacity:0;pointer-events:none;transition:.25s}
@@ -514,6 +518,7 @@
       <input type="text" id="setSyncKey" placeholder="Choose a private key…" autocomplete="off" autocapitalize="off" spellcheck="false">
       <p class="synchint" id="syncStatus">Off — your list is saved on this device only.</p>
       <p class="synchint dim">This key is also your <b>recovery key</b>: enter the same one on a new phone (or after clearing data) to restore everything. Keep it private — anyone with it can see your list.</p>
+      <button class="ghostbtn" id="openBk" style="margin-top:10px">🛟 Backups &amp; restore</button>
     </div>
     <div class="field">
       <label>Shared shopping list</label>
@@ -629,6 +634,7 @@ function save(){
   if(!booting)S.updatedAt=Date.now();            // mark genuine user edits so the newest copy wins across devices
   try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}
   scheduleCloudPush();
+  if(!booting)maybeBackup();                      // capture the day's first real edit as a restorable snapshot
 }
 /* Persist to localStorage WITHOUT stamping/pushing — used when adopting a copy that came FROM the cloud. */
 function saveLocalOnly(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}}
@@ -652,6 +658,7 @@ window.__dbApplyRemote=obj=>{                        // a copy arrived from the 
     activeTab=(S.settings&&S.settings.tab)||activeTab;
     activeFilter=(S.settings&&S.settings.filter)||activeFilter;
     try{applyTheme();render();if($("#v-shopping")&&$("#v-shopping").classList.contains("active"))renderShopping();}catch(e){}
+    maybeBackup();                                    // snapshot the real cloud state once per day
   }else{                                             // local is newer (offline edits) → push it up
     if(window.__dbCloud)window.__dbCloud.push(S);
   }
@@ -672,6 +679,112 @@ window.__dbCloudStatus=(msg,state)=>{
   const el=document.getElementById("syncStatus");
   if(el){el.textContent=msg;el.dataset.state=state||"";}
 };
+
+/* ============================================================
+   BACKUPS — dated snapshots (on-device + cloud), fully restorable.
+   Ported from the Nest app's backup engine, which held up more
+   reliably. One automatic snapshot per calendar day, kept 7 on this
+   device and 30 in the cloud, plus manual snapshots. Each snapshot
+   is the whole state stored as a JSON string (same shape as the live
+   blob, so Firebase's empty-array drop can never corrupt it). This
+   is the real safety net the reset lacked: if the list is ever wiped
+   or clobbered, roll back to any recent day — and a restore snapshots
+   the current list first, so it too is reversible.
+   ============================================================ */
+const BK_KEEP_LOCAL=7;                 // on-device snapshots retained (cloud keeps 30, pruned in the DB module)
+const LOCALBK_LS="daybreak_localbk";   // on-device snapshot list
+const LASTBK_LS="daybreak_lastbackup"; // day-stamp of the last automatic snapshot (one per calendar day)
+
+function bkStamp(){const d=new Date(),p=n=>String(n).padStart(2,"0");
+  return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())+"_"+p(d.getHours())+p(d.getMinutes())+p(d.getSeconds());}
+function bkLabel(day){
+  const m=String(day).match(/^(\d{4})-(\d{2})-(\d{2})(?:_(\d{2})(\d{2})(\d{2}))?$/);
+  if(!m)return day;
+  const dt=new Date(+m[1],+m[2]-1,+m[3],+(m[4]||0),+(m[5]||0));
+  return m[4]!=null?dt.toLocaleString(undefined,{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"})
+                   :dt.toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"});
+}
+function snapshotFor(day,label){
+  return {data:JSON.stringify(S),at:Date.now(),day:day,label:label||"auto",taskCount:(S.tasks||[]).length};
+}
+function listLocalBackups(){try{return JSON.parse(localStorage.getItem(LOCALBK_LS)||"[]");}catch(e){return [];}}
+function writeBackup(day,label){
+  const snap=snapshotFor(day,label);
+  // on-device first (always works, no cloud needed) — de-dupe by day, keep the newest BK_KEEP_LOCAL
+  let arr=listLocalBackups().filter(b=>b.day!==day); arr.push(snap); arr.sort((a,b)=>a.at-b.at);
+  while(arr.length>BK_KEEP_LOCAL)arr.shift();
+  try{localStorage.setItem(LOCALBK_LS,JSON.stringify(arr));}catch(e){}
+  // cloud (best-effort; only when a sync key is connected)
+  if(window.__dbCloud&&window.__dbCloud.connected&&window.__dbCloud.backupSave)window.__dbCloud.backupSave(day,snap);
+}
+function maybeBackup(){                 // one automatic snapshot per calendar day, real data only
+  if(!S||(S.updatedAt||0)===0)return;   // never snapshot a pristine, never-edited seed
+  const today=dayKey();
+  try{if(localStorage.getItem(LASTBK_LS)===today)return; localStorage.setItem(LASTBK_LS,today);}catch(e){return;}
+  writeBackup(today,"auto");
+}
+function backupNow(label){writeBackup(bkStamp(),label||"manual");}
+
+function openBackups(){
+  renderBackupSheet(null);                                   // cloud=null → "loading…"
+  if(window.__dbCloud&&window.__dbCloud.connected&&window.__dbCloud.backupList){
+    window.__dbCloud.backupList()
+      .then(v=>{if($("#bkSheet"))renderBackupSheet(v||{});})
+      .catch(()=>{if($("#bkSheet"))renderBackupSheet({},"err");});
+  }else{
+    renderBackupSheet({},"nocloud");                         // no key → on-device snapshots only
+  }
+}
+function renderBackupSheet(cloud,state){
+  const local=listLocalBackups(), byDay={};
+  if(cloud)Object.keys(cloud).forEach(k=>{const b=cloud[k]||{};const day=b.day||k;byDay[day]={...b,day:day,src:"cloud"};});
+  local.forEach(b=>{if(byDay[b.day])byDay[b.day].src="both";else byDay[b.day]={...b,src:"local"};});
+  const rows=Object.values(byDay).sort((a,b)=>b.at-a.at);
+  let h='<span id="bkSheet" hidden></span><h3>🛟 Backups &amp; restore</h3>'+
+    '<p class="synchint dim" style="margin:-2px 0 12px">A snapshot saves automatically each day — kept 7 on this device, 30 in the cloud. Roll back to any of them if something goes wrong.</p>';
+  if(state==="nocloud")h+='<p class="synchint" style="margin:0 0 12px">Cloud backup is off — these are on-device snapshots only. Set a private key under <b>Cloud backup &amp; sync</b> to also keep 30 days in the cloud.</p>';
+  else if(state==="err")h+='<p class="synchint" data-state="err" style="margin:0 0 12px">Couldn’t reach the cloud — showing on-device snapshots.</p>';
+  else if(cloud===null)h+='<p class="synchint dim" style="margin:0 0 12px">Loading cloud backups…</p>';
+  if(!rows.length){
+    h+='<div class="bk-empty">No snapshots yet.<br>The first one saves automatically after your next change.</div>';
+  }else{
+    h+='<div class="listcard">'+rows.map(b=>{
+      const tag=b.src==="both"?"☁️+📱":b.src==="cloud"?"☁️":"📱";
+      const extra=b.label==="before-restore"?" · pre-restore":(b.label==="manual"?" · manual":"");
+      return '<div class="lrow"><div class="lb"><b>'+bkLabel(b.day)+'</b><span>'+(b.taskCount||0)+' task'+(b.taskCount===1?"":"s")+extra+' · '+tag+'</span></div>'+
+        '<button class="bk-restore" data-restore="'+b.day+'" data-src="'+b.src+'">Restore</button></div>';
+    }).join("")+'</div>';
+  }
+  h+='<button class="ghostbtn" id="bkNow">＋ Back up now</button>';
+  openSheet(h);
+  $$("#sheet [data-restore]").forEach(btn=>btn.onclick=()=>restoreBackup(btn.dataset.restore,btn.dataset.src));
+  const bn=$("#bkNow");if(bn)bn.onclick=()=>{backupNow("manual");toast("Backup saved");setTimeout(openBackups,300);};
+}
+function restoreBackup(day,src){
+  const apply=snap=>{
+    if(!snap||!snap.data){toast("That backup looks empty");return;}
+    let restored;try{restored=JSON.parse(snap.data);}catch(e){toast("Couldn’t read that backup");return;}
+    const curN=(S.tasks||[]).length;
+    if(!confirm("Restore the "+bkLabel(day)+" backup?\n\nThis replaces your current tasks ("+curN+") with that snapshot ("+(snap.taskCount||0)+").\n\nYour current list is backed up first, so you can undo this.")) return;
+    backupNow("before-restore");                             // make the restore itself reversible
+    // keep THIS device's connection settings — restoring old tasks shouldn't change which cloud key / share you're on
+    const keep={syncKey:S.settings.syncKey,shareCode:S.settings.shareCode,gcalClient:S.settings.gcalClient,gcalPaused:S.settings.gcalPaused};
+    S=restored;
+    S.settings=Object.assign({},S.settings,keep);
+    ["tasks","shopping","bring","calendar","log"].forEach(k=>{if(!Array.isArray(S[k]))S[k]=[];});  // guard against Firebase dropping empty arrays
+    if(sharedShop!==null)S.shopping=sharedShop.slice();      // a linked shared shopping list stays the authority
+    save();                                                  // stamps updatedAt=now → becomes the new truth & pushes to cloud
+    closeSheet();applyTheme();
+    activeTab=(S.settings&&S.settings.tab)||activeTab;activeFilter=(S.settings&&S.settings.filter)||activeFilter;
+    render();if($("#v-shopping")&&$("#v-shopping").classList.contains("active"))renderShopping();
+    toast("Restored the "+bkLabel(day)+" backup");
+  };
+  const lb=listLocalBackups().find(b=>b.day===day);
+  if((src==="local"||src==="both")&&lb){apply(lb);return;}
+  if(window.__dbCloud&&window.__dbCloud.backupGet){window.__dbCloud.backupGet(day).then(apply).catch(()=>{if(lb)apply(lb);else toast("Couldn’t load that backup");});}
+  else if(lb)apply(lb);
+  else toast("Couldn’t load that backup");
+}
 
 /* ============================================================
    GOOGLE CALENDAR (read-only) — today's events feed the Brief.
@@ -1396,6 +1509,7 @@ function wire(){
     if(window.__dbCloud){ k?window.__dbCloud.connect(k):window.__dbCloud.disconnect(); }
     else if(!k){ const el=$("#syncStatus"); if(el){el.textContent="Off — your list is saved on this device only.";el.dataset.state="";} }
   };
+  $("#openBk").onclick=openBackups;
   // shared shopping list code
   $("#setShareCode").value=(S.settings.shareCode)||"";
   $("#setShareCode").onchange=e=>{
@@ -1442,6 +1556,7 @@ applyTheme();
 wire();
 navTo("today");
 booting=false;   // from here on, save() stamps updatedAt and pushes to the cloud
+maybeBackup();   // returning user with real data → capture today's snapshot even without an edit yet
 
 // Re-check the day boundary whenever the app comes back to the foreground (installed PWAs stay in memory for days).
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)dayRollover();});
@@ -1461,7 +1576,7 @@ if("serviceWorker" in navigator){
      Whole-state blob, newest-wins by updatedAt. No account needed — the private key namespaces (and gates) the data. -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
-  import { getDatabase, ref, onValue, set, off, update, remove } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
+  import { getDatabase, ref, onValue, set, off, update, remove, get } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
   const firebaseConfig = {
     apiKey: "AIzaSyD9AJbPC9M4gpTyvfIoRcqILq0ZOom1OBs",
     authDomain: "bon-echo-bd946.firebaseapp.com",
@@ -1474,13 +1589,13 @@ if("serviceWorker" in navigator){
   const status=(m,s)=>{ if(window.__dbCloudStatus) window.__dbCloudStatus(m,s); };
   const sanitize=k=>k.replace(/[.#$\[\]\/\s]+/g,"_").slice(0,64);
   try{
-    const app=initializeApp(firebaseConfig); const db=getDatabase(app); let curRef=null; let lastSent="";
+    const app=initializeApp(firebaseConfig); const db=getDatabase(app); let curRef=null; let lastSent=""; let curKey="";
     window.__dbCloud={
       ready:true, connected:false,
       connect(key){
         const safe=sanitize(key); if(!safe){ status("Enter a private key to turn on cloud backup.","err"); return; }
         if(curRef) off(curRef);
-        curRef=ref(db,"daybreak/"+safe+"/blob"); this.connected=true; lastSent=""; status("Connecting…","");
+        curKey=safe; curRef=ref(db,"daybreak/"+safe+"/blob"); this.connected=true; lastSent=""; status("Connecting…","");
         onValue(curRef, snap=>{
           this.connected=true;
           const v=snap.val();
@@ -1496,11 +1611,29 @@ if("serviceWorker" in navigator){
           }
         }, err=>{ this.connected=false; status("Cloud sync error — check the database rules in Firebase.","err"); console.warn("[Daybreak] DB read error:",err); });
       },
-      disconnect(){ if(curRef) off(curRef); curRef=null; this.connected=false; lastSent=""; status("Off — your list is saved on this device only.",""); },
+      disconnect(){ if(curRef) off(curRef); curRef=null; curKey=""; this.connected=false; lastSent=""; status("Off — your list is saved on this device only.",""); },
       push(obj){
         if(!curRef||!this.connected||!obj) return;
         const s=JSON.stringify(obj); if(s===lastSent) return; lastSent=s;
         set(curRef,s).catch(e=>{ status("Cloud sync error — check the database rules in Firebase.","err"); console.warn("[Daybreak] DB write error:",e); });
+      },
+      /* ---- dated snapshots (kept under daybreak/<key>/backups) — the restore safety net ---- */
+      async backupSave(day,snap){
+        if(!curKey||!snap) return;
+        try{
+          await set(ref(db,"daybreak/"+curKey+"/backups/"+day),snap);
+          const s=await get(ref(db,"daybreak/"+curKey+"/backups"));   // prune to the newest 30 days
+          const v=s.val()||{}; const keys=Object.keys(v).sort();
+          while(keys.length>30){ const k=keys.shift(); remove(ref(db,"daybreak/"+curKey+"/backups/"+k)).catch(()=>{}); }
+        }catch(e){ console.warn("[Daybreak] backup save error:",e); }
+      },
+      backupList(){
+        if(!curKey) return Promise.resolve({});
+        return get(ref(db,"daybreak/"+curKey+"/backups")).then(s=>s.val()||{}).catch(()=>({}));
+      },
+      backupGet(day){
+        if(!curKey) return Promise.resolve(null);
+        return get(ref(db,"daybreak/"+curKey+"/backups/"+day)).then(s=>s.val()).catch(()=>null);
       }
     };
 
