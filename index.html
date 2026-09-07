@@ -309,8 +309,8 @@
   .scrim.show{opacity:1;pointer-events:auto}
   .sheet{position:fixed;left:0;right:0;bottom:0;z-index:70;background:var(--surface);border-radius:28px 28px 0 0;
     padding:10px 20px calc(24px + env(safe-area-inset-bottom));box-shadow:var(--shadow-lg);transform:translateY(102%);transition:transform .3s cubic-bezier(.2,.8,.2,1);
-    max-width:520px;margin:0 auto;max-height:90vh;overflow-y:auto}
-  .sheet.show{transform:translateY(0)}
+    max-width:520px;margin:0 auto;max-height:90vh;overflow-y:auto;pointer-events:none}
+  .sheet.show{transform:translateY(0);pointer-events:auto}
   .grab{width:40px;height:5px;border-radius:99px;background:var(--line);margin:6px auto 14px}
   .sheet h3{font-family:var(--font-display);font-weight:800;font-size:20px;margin:0 0 6px}
   .savebtn{width:100%;padding:15px;border-radius:var(--r-pill);border:0;background:var(--coral);color:var(--on-coral);
