@@ -606,9 +606,12 @@ let freshInstall=false;                // set in load() when there's no prior da
    "What's New" pop-up shows only the entries newer than the
    version this device last saw (see maybeWhatsNew).
    ============================================================ */
-const APP_VERSION=23;   // ⇄ sw.js cache "daybreak-v23"
+const APP_VERSION=24;   // ⇄ sw.js cache "daybreak-v24"
 const LASTSEEN_LS="daybreak_lastSeenVer";
 const PATCH_NOTES=[
+  {v:24,date:"2026-09-22",title:"Recurring & disappearing-task fixes",notes:[
+    "Fixed overdue daily tasks: checking one off now schedules the next day instead of springing back as still-due.",
+    "Fixed a sync bug where opening the app on another device could overwrite newer changes — the cause of tasks you added going missing."]},
   {v:23,date:"2026-09-21",title:"Patch notes & What's New",notes:[
     "Added this Patch Notes list in Settings, showing every update newest-first.",
     "A one-time “What’s New” note now appears after an update, then won’t show again."]},
@@ -1093,13 +1096,18 @@ function addTask(o){
   save();
 }
 function recurNext(due,freq){
-  // due is a calendar date string; add the interval and re-format WITHOUT the 3 AM shift
-  // (parseKey gives midnight, and dayKey would push midnight back into the previous day).
-  const d=parseKey(due||dayKey());
-  if(freq==="daily")return fmtCal(addDays(d,1));
-  if(freq==="weekly")return fmtCal(addDays(d,7));
-  if(freq==="monthly"){const x=new Date(d);x.setMonth(x.getMonth()+1);return fmtCal(x);}
-  return due;
+  // Schedule the NEXT occurrence STRICTLY after today, so finishing an OVERDUE recurring task
+  // moves it into the future instead of landing on/before today (which refreshRecurring would
+  // then immediately re-arm — the old bug where overdue daily tasks kept popping back).
+  // Formats WITHOUT the 3 AM shift (parseKey gives midnight; dayKey would push it a day back).
+  const today=parseKey(dayKey());
+  let d=parseKey(due||dayKey());
+  if(d<today)d=today;                 // an overdue task's next one starts counting from today
+  if(freq==="daily")d=addDays(d,1);
+  else if(freq==="weekly")d=addDays(d,7);
+  else if(freq==="monthly"){const x=new Date(d);x.setMonth(x.getMonth()+1);d=x;}
+  else return due;
+  return fmtCal(d);
 }
 function toggleTask(id){
   const t=S.tasks.find(x=>x.id===id);if(!t)return;
@@ -1124,7 +1132,10 @@ function refreshRecurring(){
   S.tasks.forEach(t=>{
     if(t.recur&&t.done&&t.due&&t.due<=tk){t.done=false;delete t.doneAt;delete t.doneDay;t.day=tk;ch=true;}
   });
-  if(ch)save();
+  // Re-arming a recurring item is derived automatically on every device — NOT a user edit.
+  // Persist locally but DON'T stamp updatedAt / push, or a behind device would falsely mark
+  // itself "newest" and clobber newer cloud data (the disappearing-tasks bug).
+  if(ch)saveLocalOnly();
 }
 // When the logical day has advanced (rolls at the Settings reset hour), reset the daily bits.
 // Runs at boot AND whenever the app regains focus/visibility, so a PWA left open overnight still resets.
@@ -1133,7 +1144,9 @@ function dayRollover(){
   if(S.bringReset!==tk){S.bring.forEach(b=>b.done=false);S.bringReset=tk;ch=true;}
   if(S.lastSeenDay!==tk){S.lastSeenDay=tk;ch=true;}
   refreshRecurring();            // re-arm bills / chores whose next occurrence has arrived (saves itself)
-  if(ch)save();
+  // Daily rollover is derived per-device, not a user edit → local-only, no version bump / cloud push
+  // (prevents a behind device from stamping itself "newest" and overwriting good cloud data).
+  if(ch)saveLocalOnly();
   if($("#v-today")&&$("#v-today").classList.contains("active"))render();
 }
 function afterComplete(id){
@@ -1721,16 +1734,19 @@ if("serviceWorker" in navigator){
   const status=(m,s)=>{ if(window.__dbCloudStatus) window.__dbCloudStatus(m,s); };
   const sanitize=k=>k.replace(/[.#$\[\]\/\s]+/g,"_").slice(0,64);
   try{
-    const app=initializeApp(firebaseConfig); const db=getDatabase(app); let curRef=null; let lastSent=""; let curKey="";
+    const app=initializeApp(firebaseConfig); const db=getDatabase(app); let curRef=null; let lastSent=""; let curKey=""; let primed=false;
     window.__dbCloud={
       ready:true, connected:false,
       connect(key){
         const safe=sanitize(key); if(!safe){ status("Enter a private key to turn on cloud backup.","err"); return; }
         if(curRef) off(curRef);
-        curKey=safe; curRef=ref(db,"daybreak/"+safe+"/blob"); this.connected=true; lastSent=""; status("Connecting…","");
+        curKey=safe; curRef=ref(db,"daybreak/"+safe+"/blob"); this.connected=true; lastSent=""; primed=false; status("Connecting…","");
         onValue(curRef, snap=>{
           this.connected=true;
           const v=snap.val();
+          // "primed" flips true once we've heard the server's current value. Until then we NEVER push,
+          // so a device that's behind can't overwrite newer cloud data before it has even seen it.
+          primed=true;
           if(v){
             if(v===lastSent){ status("Backed up to cloud ✓","on"); return; } // echo of our own write
             lastSent=v;
@@ -1743,9 +1759,9 @@ if("serviceWorker" in navigator){
           }
         }, err=>{ this.connected=false; status("Cloud sync error — check the database rules in Firebase.","err"); console.warn("[Daybreak] DB read error:",err); });
       },
-      disconnect(){ if(curRef) off(curRef); curRef=null; curKey=""; this.connected=false; lastSent=""; status("Off — your list is saved on this device only.",""); },
+      disconnect(){ if(curRef) off(curRef); curRef=null; curKey=""; this.connected=false; lastSent=""; primed=false; status("Off — your list is saved on this device only.",""); },
       push(obj){
-        if(!curRef||!this.connected||!obj) return;
+        if(!curRef||!this.connected||!primed||!obj) return;   // wait until we've seen the cloud's current value first
         const s=JSON.stringify(obj); if(s===lastSent) return; lastSent=s;
         set(curRef,s).catch(e=>{ status("Cloud sync error — check the database rules in Firebase.","err"); console.warn("[Daybreak] DB write error:",e); });
       },
