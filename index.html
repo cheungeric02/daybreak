@@ -2,54 +2,54 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Daybreak</title>
+<title>Dailies</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#F2643C" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#0F1413" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#FBF0E4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#17110C" media="(prefers-color-scheme: dark)">
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="icon" href="./icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="./icon.svg">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Daybreak">
+<meta name="apple-mobile-web-app-title" content="Dailies">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700;12..96,800&family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;1,500&display=swap">
 <style>
   :root{
-    --ground:#EEF2F1; --ground-2:#E3E9E8; --surface:#FFFFFF;
-    --surface-tonal:#FDECE6; --surface-teal:#E4F0EE;
-    --ink:#1E2624; --ink-soft:#4B5654; --muted:#7C8785; --line:#DCE3E1;
-    --coral:#F2643C; --coral-deep:#C84A26; --on-coral:#FFFFFF;
-    --teal:#0E7C86; --teal-soft:#3AA0A6;
-    --amber:#D98213; --amber-bg:#FBEFD9;
-    --danger:#D0492E; --danger-bg:#FBE3DD;
+    --ground:#FBF0E4; --ground-2:#F3E2D0; --surface:#FFFBF6;
+    --surface-tonal:#FCE1D2; --surface-teal:#F5E3EE;
+    --ink:#2A1D15; --ink-soft:#665248; --muted:#9A8578; --line:#EEDDCB;
+    --coral:#EA5A32; --coral-deep:#B4141B; --on-coral:#FFFFFF;
+    --teal:#8A2D5F; --teal-soft:#B25A88;
+    --amber:#C67F12; --amber-bg:#FBEBD2;
+    --danger:#CF4A2C; --danger-bg:#FBE0D6;
     --green:#2F8F63; --green-bg:#E1F1E7; --gold:#C99A2E;
-    --shadow:0 1px 2px rgba(20,30,28,.06),0 8px 28px rgba(20,30,28,.10);
-    --shadow-lg:0 12px 48px rgba(20,30,28,.22);
+    --shadow:0 1px 2px rgba(60,30,20,.06),0 8px 28px rgba(60,30,20,.10);
+    --shadow-lg:0 12px 48px rgba(60,30,20,.20);
     --r-card:26px; --r-pill:999px; --r-item:18px;
     --font-display:"Bricolage Grotesque",ui-sans-serif,system-ui,sans-serif;
     --font-body:"Plus Jakarta Sans",ui-sans-serif,system-ui,sans-serif;
   }
   @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
-    --ground:#0F1413; --ground-2:#161D1C; --surface:#1A2220;
-    --surface-tonal:#2C201B; --surface-teal:#132523;
-    --ink:#EEF3F1; --ink-soft:#B8C2BF; --muted:#84908D; --line:#2A3432;
-    --coral:#FF8A63; --coral-deep:#FFB295; --on-coral:#2A140C;
-    --teal:#4FBDC4; --teal-soft:#7FD3D8;
-    --amber:#F0B357; --amber-bg:#33270F;
+    --ground:#17110C; --ground-2:#20180F; --surface:#221A12;
+    --surface-tonal:#3A2015; --surface-teal:#241520;
+    --ink:#F4ECE3; --ink-soft:#C7B7AB; --muted:#8A7A6D; --line:#33281F;
+    --coral:#FF8A5C; --coral-deep:#FFB59A; --on-coral:#2A0E06;
+    --teal:#E39AC0; --teal-soft:#C77BA3;
+    --amber:#F0B357; --amber-bg:#33260F;
     --danger:#FF8763; --danger-bg:#3A1B12;
     --green:#6FCF9A; --green-bg:#12271C; --gold:#E7C15E;
     --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 34px rgba(0,0,0,.5);
     --shadow-lg:0 14px 54px rgba(0,0,0,.6);
   }}
   :root[data-theme="dark"]{
-    --ground:#0F1413; --ground-2:#161D1C; --surface:#1A2220;
-    --surface-tonal:#2C201B; --surface-teal:#132523;
-    --ink:#EEF3F1; --ink-soft:#B8C2BF; --muted:#84908D; --line:#2A3432;
-    --coral:#FF8A63; --coral-deep:#FFB295; --on-coral:#2A140C;
-    --teal:#4FBDC4; --teal-soft:#7FD3D8;
-    --amber:#F0B357; --amber-bg:#33270F;
+    --ground:#17110C; --ground-2:#20180F; --surface:#221A12;
+    --surface-tonal:#3A2015; --surface-teal:#241520;
+    --ink:#F4ECE3; --ink-soft:#C7B7AB; --muted:#8A7A6D; --line:#33281F;
+    --coral:#FF8A5C; --coral-deep:#FFB59A; --on-coral:#2A0E06;
+    --teal:#E39AC0; --teal-soft:#C77BA3;
+    --amber:#F0B357; --amber-bg:#33260F;
     --danger:#FF8763; --danger-bg:#3A1B12;
     --green:#6FCF9A; --green-bg:#12271C; --gold:#E7C15E;
     --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 34px rgba(0,0,0,.5);
@@ -90,7 +90,7 @@
   .fchip.fchip-odue.on{background:var(--danger);color:#fff}
   .hlink{color:var(--coral);font-weight:800;text-decoration:underline;text-underline-offset:2px;cursor:pointer;white-space:nowrap}
   .greet .prog{margin-top:14px;height:9px;border-radius:99px;background:var(--ground-2);overflow:hidden}
-  .greet .prog i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--coral),var(--teal));transition:width .5s cubic-bezier(.2,.8,.2,1)}
+  .greet .prog i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#FB923C,#B4141B);transition:width .5s cubic-bezier(.2,.8,.2,1)}
   .greet .progtxt{font-size:12px;color:var(--muted);font-weight:600;margin-top:6px}
 
   /* ---------- morning banner ---------- */
@@ -117,7 +117,7 @@
     display:grid;place-items:center;font-size:18px;cursor:pointer;transition:.2s}
   .qadd .mic.listening{animation:pulse 1s infinite;background:var(--coral);color:var(--on-coral)}
   .qadd .plus{width:44px;height:44px;border-radius:50%;flex:none;background:var(--coral);border:0;color:var(--on-coral);
-    display:grid;place-items:center;font-size:26px;font-weight:300;line-height:1;box-shadow:0 4px 12px rgba(242,100,60,.4);cursor:pointer;transition:.15s}
+    display:grid;place-items:center;font-size:26px;font-weight:300;line-height:1;box-shadow:0 4px 12px rgba(234,90,50,.4);cursor:pointer;transition:.15s}
   .qadd .plus:active{transform:scale(.9)}
   @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.12)}}
   /* dock hint — hidden until you're typing/parsing or just added something */
@@ -357,7 +357,7 @@
       padding:26px 16px;gap:5px;box-shadow:none;background:var(--surface);
     }
     .nav::before{
-      content:"☀ Daybreak";font-family:var(--font-display);font-weight:800;
+      content:"Dailies";font-family:var(--font-display);font-weight:800;
       font-size:21px;letter-spacing:-.02em;color:var(--ink);
       padding:4px 12px 20px;white-space:nowrap;
     }
@@ -555,10 +555,10 @@
     <div class="field">
       <label>Patch notes</label>
       <div class="patchlist" id="patchList"></div>
-      <p class="synchint dim">Every update to Daybreak, newest first.</p>
+      <p class="synchint dim">Every update to Dailies, newest first.</p>
     </div>
     <button class="dangerbtn" id="wipe">Clear everything</button>
-    <p class="qhint" style="text-align:center;margin-top:18px">Daybreak · <span id="setVer"></span> · saved on this device · cloud backup optional</p>
+    <p class="qhint" style="text-align:center;margin-top:18px">Dailies · <span id="setVer"></span> · saved on this device · cloud backup optional</p>
   </section>
 
   <!-- docked composer — fixed above the nav; only shown on the Today view (via .app.today-open) -->
@@ -606,9 +606,12 @@ let freshInstall=false;                // set in load() when there's no prior da
    "What's New" pop-up shows only the entries newer than the
    version this device last saw (see maybeWhatsNew).
    ============================================================ */
-const APP_VERSION=25;   // ⇄ sw.js cache "daybreak-v25"
+const APP_VERSION=26;   // ⇄ sw.js cache "daybreak-v26"
 const LASTSEEN_LS="daybreak_lastSeenVer";
 const PATCH_NOTES=[
+  {v:26,date:"2026-09-24",title:"Say hello to Dailies",notes:[
+    "Daybreak is now Dailies — same app, all your lists and data intact, with a fresh name and a warm new look.",
+    "A brand-new app icon plus a redesigned warm colour theme across both light and dark modes."]},
   {v:25,date:"2026-09-24",title:"Opens instantly offline",notes:[
     "Daybreak now opens straight from cache every time — fully offline (e.g. on the subway) and with no more hanging on weak “lie-fi” signal.",
     "It quietly refreshes itself in the background once you’re back online."]},
@@ -1498,8 +1501,8 @@ function celebrate(){
 }
 function fireConfetti(special){
   sizeCanvas();pieces=[];
-  const colors=special?["#C99A2E","#E7C15E","#F2643C","#FFE7A8","#FFF","#0E7C86"]
-                      :["#F2643C","#0E7C86","#D98213","#2F8F63","#FF8A63"];
+  const colors=special?["#C99A2E","#E7C15E","#FB923C","#FFE7A8","#FFF","#8A1220"]
+                      :["#FB923C","#EF4D33","#8A2D5F","#8A1220","#D98213"];
   const N=special?220:140;
   for(let i=0;i<N;i++)pieces.push({
     x:innerWidth/2+(Math.random()-.5)*80,y:innerHeight*0.34,

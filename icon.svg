@@ -1,26 +1,21 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Daybreak">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Dailies">
   <defs>
-    <linearGradient id="sky" x1="70" y1="30" x2="450" y2="480" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#FF7A4D"/>
-      <stop offset="0.52" stop-color="#F2643C"/>
-      <stop offset="1" stop-color="#0E7C86"/>
-    </linearGradient>
-    <clipPath id="above"><rect x="0" y="0" width="512" height="318"/></clipPath>
+    <linearGradient id="d0" gradientUnits="userSpaceOnUse" x1="41.5" y1="15.55" x2="50.99" y2="32.66"><stop offset="0" stop-color="#FB923C"/><stop offset="1" stop-color="#F76A2A"/></linearGradient>
+    <linearGradient id="d1" gradientUnits="userSpaceOnUse" x1="50.99" y1="32.66" x2="40.33" y2="49.08"><stop offset="0" stop-color="#F76A2A"/><stop offset="1" stop-color="#EE4F28"/></linearGradient>
+    <linearGradient id="d2" gradientUnits="userSpaceOnUse" x1="40.33" y1="49.08" x2="20.83" y2="47.37"><stop offset="0" stop-color="#EE4F28"/><stop offset="1" stop-color="#D62F23"/></linearGradient>
+    <linearGradient id="d3" gradientUnits="userSpaceOnUse" x1="20.83" y1="47.37" x2="13.18" y2="29.36"><stop offset="0" stop-color="#D62F23"/><stop offset="1" stop-color="#AE1A1E"/></linearGradient>
+    <linearGradient id="d4" gradientUnits="userSpaceOnUse" x1="13.18" y1="29.36" x2="25.49" y2="14.14"><stop offset="0" stop-color="#AE1A1E"/><stop offset="1" stop-color="#8A1220"/></linearGradient>
   </defs>
-  <rect width="512" height="512" fill="url(#sky)"/>
-  <!-- rising sun (top half shows above the horizon) -->
-  <g clip-path="url(#above)">
-    <circle cx="256" cy="318" r="106" fill="#FFE2B0"/>
+  <rect width="512" height="512" fill="#FFF3E6"/>
+  <g transform="translate(0,10) scale(8)">
+    <g fill="none" stroke-width="5" stroke-linecap="round">
+      <path d="M41.5 15.55 A19 19 0 0 1 50.99 32.66" stroke="url(#d0)"/>
+      <path d="M50.99 32.66 A19 19 0 0 1 40.33 49.08" stroke="url(#d1)"/>
+      <path d="M40.33 49.08 A19 19 0 0 1 20.83 47.37" stroke="url(#d2)"/>
+      <path d="M20.83 47.37 A19 19 0 0 1 13.18 29.36" stroke="url(#d3)"/>
+      <path d="M13.18 29.36 A19 19 0 0 1 25.49 14.14" stroke="url(#d4)"/>
+    </g>
+    <path d="M30.5 9.4 L27.3 20.9 L18.7 11.1 Z" fill="#8A1220" stroke="#8A1220" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/>
+    <path d="M23.5 33 l6 6.2 l12.5 -14.4" fill="none" stroke="#8A1220" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
   </g>
-  <!-- rays -->
-  <g fill="none" stroke="#FFEECB" stroke-width="17" stroke-linecap="round" opacity="0.96">
-    <line x1="256" y1="150" x2="256" y2="118"/>
-    <line x1="150" y1="200" x2="128" y2="178"/>
-    <line x1="362" y1="200" x2="384" y2="178"/>
-    <line x1="196" y1="166" x2="182" y2="140"/>
-    <line x1="316" y1="166" x2="330" y2="140"/>
-  </g>
-  <!-- horizon -->
-  <rect x="118" y="318" width="276" height="17" rx="8.5" fill="#FFFFFF"/>
-  <rect x="150" y="356" width="212" height="14" rx="7" fill="#FFFFFF" opacity="0.55"/>
 </svg>

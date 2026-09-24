@@ -1,12 +1,12 @@
 {
-  "name": "Daybreak",
-  "short_name": "Daybreak",
+  "name": "Dailies",
+  "short_name": "Dailies",
   "description": "Your day at a glance — a calm, self-cleaning to-do list.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#EEF2F1",
-  "theme_color": "#F2643C",
+  "background_color": "#FBF0E4",
+  "theme_color": "#FBF0E4",
   "orientation": "any",
   "categories": ["productivity", "lifestyle"],
   "icons": [
