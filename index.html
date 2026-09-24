@@ -72,14 +72,14 @@
   /* ---------- greeting ---------- */
   .greet{padding:calc(18px + env(safe-area-inset-top)) 4px 4px}
   .greet .row{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
-  .greet .hello{font-family:var(--font-display);font-weight:800;font-size:27px;letter-spacing:-.02em;margin:0}
-  .greet .date{color:var(--muted);font-weight:600;font-size:13.5px;margin:3px 0 0}
+  .greet .hello{font-family:var(--font-display);font-weight:800;font-size:27px;line-height:1.05;letter-spacing:-.02em;margin:0}
+  .greet .date{color:var(--muted);font-weight:600;font-size:13.5px;margin:5px 0 0 45px}
   /* recurring-loop brand mark (shared: sidebar brand + greeting) */
   .lmk{display:block}
   .lmk-tip{fill:var(--lmk-tip);stroke:var(--lmk-tip)}
   .lmk-chk{fill:none;stroke:var(--lmk-tip)}
-  .greet .hellowrap{display:flex;align-items:center;gap:11px;min-width:0}
-  .greet .hellomark{width:34px;height:34px;flex:none}
+  .greet .hellowrap{display:flex;align-items:flex-start;gap:11px;min-width:0}
+  .greet .hellomark{width:32px;height:32px;flex:none}
   .hbtns{display:flex;gap:8px;align-items:center;flex:none}
   .tglbtn{width:38px;height:38px;border-radius:50%;border:1px solid var(--line);background:var(--surface);color:var(--ink);
     font-size:16px;cursor:pointer;display:grid;place-items:center;transition:.15s}
@@ -471,10 +471,7 @@
             <path class="lmk-tip" d="M30.5 9.4 L27.3 20.9 L18.7 11.1 Z" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/>
             <path class="lmk-chk" d="M23.5 33 l6 6.2 l12.5 -14.4" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
-          <div>
-            <h1 class="hello" id="hello">Hello</h1>
-            <p class="date" id="date"></p>
-          </div>
+          <h1 class="hello" id="hello">Hello</h1>
         </div>
         <div class="hbtns">
           <button class="odue" id="overduePill" title="Jump to overdue" hidden>⚠ <span id="odueN">0</span></button>
@@ -482,6 +479,7 @@
           <button class="streak" id="streak" title="Your streak">🔥 <span id="streakN">0</span></button>
         </div>
       </div>
+      <p class="date" id="date"></p>
       <div class="prog"><i id="progbar" style="width:0%"></i></div>
       <p class="progtxt" id="progtxt"></p>
     </div>
@@ -651,11 +649,11 @@ let freshInstall=false;                // set in load() when there's no prior da
    "What's New" pop-up shows only the entries newer than the
    version this device last saw (see maybeWhatsNew).
    ============================================================ */
-const APP_VERSION=28;   // ⇄ sw.js cache "daybreak-v28"
+const APP_VERSION=29;   // ⇄ sw.js cache "daybreak-v29"
 const LASTSEEN_LS="daybreak_lastSeenVer";
 const PATCH_NOTES=[
-  {v:28,date:"2026-09-24",title:"The Dailies logo, front and centre",notes:[
-    "The recurring-loop logo now sits beside your greeting on the Today screen.",
+  {v:29,date:"2026-09-24",title:"The Dailies logo, front and centre",notes:[
+    "The recurring-loop logo now sits right on the same line as your greeting, sized to match.",
     "On desktop, the sidebar shows the logo with the “dailies” wordmark up top, nicely aligned."]},
   {v:26,date:"2026-09-24",title:"Say hello to Dailies",notes:[
     "Daybreak is now Dailies — same app, all your lists and data intact, with a fresh name and a warm new look.",
