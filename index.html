@@ -606,9 +606,12 @@ let freshInstall=false;                // set in load() when there's no prior da
    "What's New" pop-up shows only the entries newer than the
    version this device last saw (see maybeWhatsNew).
    ============================================================ */
-const APP_VERSION=24;   // ⇄ sw.js cache "daybreak-v24"
+const APP_VERSION=25;   // ⇄ sw.js cache "daybreak-v25"
 const LASTSEEN_LS="daybreak_lastSeenVer";
 const PATCH_NOTES=[
+  {v:25,date:"2026-09-24",title:"Opens instantly offline",notes:[
+    "Daybreak now opens straight from cache every time — fully offline (e.g. on the subway) and with no more hanging on weak “lie-fi” signal.",
+    "It quietly refreshes itself in the background once you’re back online."]},
   {v:24,date:"2026-09-22",title:"Recurring & disappearing-task fixes",notes:[
     "Fixed overdue daily tasks: checking one off now schedules the next day instead of springing back as still-due.",
     "Fixed a sync bug where opening the app on another device could overwrite newer changes — the cause of tasks you added going missing."]},

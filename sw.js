@@ -1,6 +1,6 @@
 /* Daybreak service worker — offline app shell.
    Bump CACHE when index.html changes so clients pull the new build. */
-const CACHE = "daybreak-v24";
+const CACHE = "daybreak-v25";
 const CORE = ["./", "./index.html", "./manifest.webmanifest", "./icon.svg"];
 
 self.addEventListener("install", e => {
@@ -26,22 +26,34 @@ self.addEventListener("fetch", e => {
     return; // let the browser handle it normally
   }
 
-  // Navigations: network-first (fresh app), fall back to cached shell offline.
+  // Navigations: STALE-WHILE-REVALIDATE — serve the cached shell instantly (no network wait, so it
+  // opens fully offline and never hangs on weak "lie-fi" signal), then refresh it in the background
+  // for next launch. Only the very first load (nothing cached yet) waits for the network.
   if (req.mode === "navigate") {
     e.respondWith(
-      fetch(req)
-        .then(r => { const cp = r.clone(); caches.open(CACHE).then(c => c.put("./index.html", cp)); return r; })
-        .catch(() => caches.match("./index.html").then(r => r || caches.match("./")))
+      caches.open(CACHE).then(cache =>
+        cache.match("./index.html").then(cached => {
+          const fresh = fetch(req)
+            .then(r => { if (r && r.ok) cache.put("./index.html", r.clone()); return r; })
+            .catch(() => cached);            // offline / lie-fi timeout → keep the cached shell
+          return cached || fresh;            // cached copy immediately if we have one, else first-load network
+        })
+      )
     );
     return;
   }
 
-  // Same-origin assets: cache-first.
+  // Same-origin assets: stale-while-revalidate — instant from cache (works offline), refreshed in the background.
   if (url.origin === location.origin) {
     e.respondWith(
-      caches.match(req).then(r => r || fetch(req).then(rr => {
-        const cp = rr.clone(); caches.open(CACHE).then(c => c.put(req, cp)); return rr;
-      }))
+      caches.open(CACHE).then(cache =>
+        cache.match(req).then(cached => {
+          const fresh = fetch(req)
+            .then(r => { if (r && r.ok) cache.put(req, r.clone()); return r; })
+            .catch(() => cached);
+          return cached || fresh;
+        })
+      )
     );
     return;
   }
