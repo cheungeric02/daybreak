@@ -24,7 +24,7 @@
     --teal:#8A2D5F; --teal-soft:#B25A88;
     --amber:#C67F12; --amber-bg:#FBEBD2;
     --danger:#CF4A2C; --danger-bg:#FBE0D6;
-    --green:#2F8F63; --green-bg:#E1F1E7; --gold:#C99A2E;
+    --green:#2F8F63; --green-bg:#E1F1E7; --gold:#C99A2E; --lmk-tip:#8A1220;
     --shadow:0 1px 2px rgba(60,30,20,.06),0 8px 28px rgba(60,30,20,.10);
     --shadow-lg:0 12px 48px rgba(60,30,20,.20);
     --r-card:26px; --r-pill:999px; --r-item:18px;
@@ -39,7 +39,7 @@
     --teal:#E39AC0; --teal-soft:#C77BA3;
     --amber:#F0B357; --amber-bg:#33260F;
     --danger:#FF8763; --danger-bg:#3A1B12;
-    --green:#6FCF9A; --green-bg:#12271C; --gold:#E7C15E;
+    --green:#6FCF9A; --green-bg:#12271C; --gold:#E7C15E; --lmk-tip:#EC6A48;
     --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 34px rgba(0,0,0,.5);
     --shadow-lg:0 14px 54px rgba(0,0,0,.6);
   }}
@@ -51,7 +51,7 @@
     --teal:#E39AC0; --teal-soft:#C77BA3;
     --amber:#F0B357; --amber-bg:#33260F;
     --danger:#FF8763; --danger-bg:#3A1B12;
-    --green:#6FCF9A; --green-bg:#12271C; --gold:#E7C15E;
+    --green:#6FCF9A; --green-bg:#12271C; --gold:#E7C15E; --lmk-tip:#EC6A48;
     --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 34px rgba(0,0,0,.5);
     --shadow-lg:0 14px 54px rgba(0,0,0,.6);
   }
@@ -74,6 +74,12 @@
   .greet .row{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
   .greet .hello{font-family:var(--font-display);font-weight:800;font-size:27px;letter-spacing:-.02em;margin:0}
   .greet .date{color:var(--muted);font-weight:600;font-size:13.5px;margin:3px 0 0}
+  /* recurring-loop brand mark (shared: sidebar brand + greeting) */
+  .lmk{display:block}
+  .lmk-tip{fill:var(--lmk-tip);stroke:var(--lmk-tip)}
+  .lmk-chk{fill:none;stroke:var(--lmk-tip)}
+  .greet .hellowrap{display:flex;align-items:center;gap:11px;min-width:0}
+  .greet .hellomark{width:34px;height:34px;flex:none}
   .hbtns{display:flex;gap:8px;align-items:center;flex:none}
   .tglbtn{width:38px;height:38px;border-radius:50%;border:1px solid var(--line);background:var(--surface);color:var(--ink);
     font-size:16px;cursor:pointer;display:grid;place-items:center;transition:.15s}
@@ -222,6 +228,7 @@
     background:none;border:0;cursor:pointer;padding:2px 6px}
   .nav button .ico{font-size:19px}
   .nav button.on{color:var(--coral)}
+  .nav .brand{display:none} /* shown only in the desktop sidebar */
 
   /* ---------- views ---------- */
   .view{display:none}
@@ -356,10 +363,14 @@
       border:0;border-right:1px solid var(--line);border-radius:0;
       padding:26px 16px;gap:5px;box-shadow:none;background:var(--surface);
     }
-    .nav::before{
-      content:"Dailies";font-family:var(--font-display);font-weight:800;
-      font-size:21px;letter-spacing:-.02em;color:var(--ink);
-      padding:4px 12px 20px;white-space:nowrap;
+    .nav .brand{
+      display:flex;align-items:center;gap:9px;
+      padding:2px 10px 22px;white-space:nowrap;
+    }
+    .nav .brand .lmk{width:28px;height:28px;flex:none}
+    .nav .brand span{
+      font-family:var(--font-display);font-weight:800;
+      font-size:22px;letter-spacing:-.02em;color:var(--ink);text-transform:lowercase;
     }
     .nav button{
       flex-direction:row;justify-content:flex-start;align-items:center;gap:14px;
@@ -448,9 +459,22 @@
   <section class="view active" id="v-today">
     <div class="greet">
       <div class="row">
-        <div>
-          <h1 class="hello" id="hello">Hello</h1>
-          <p class="date" id="date"></p>
+        <div class="hellowrap">
+          <svg class="lmk hellomark" viewBox="6 5 52 52" aria-hidden="true">
+            <g fill="none" stroke-width="5" stroke-linecap="round">
+              <path d="M41.5 15.55 A19 19 0 0 1 50.99 32.66" stroke="url(#lm0)"/>
+              <path d="M50.99 32.66 A19 19 0 0 1 40.33 49.08" stroke="url(#lm1)"/>
+              <path d="M40.33 49.08 A19 19 0 0 1 20.83 47.37" stroke="url(#lm2)"/>
+              <path d="M20.83 47.37 A19 19 0 0 1 13.18 29.36" stroke="url(#lm3)"/>
+              <path d="M13.18 29.36 A19 19 0 0 1 25.49 14.14" stroke="url(#lm4)"/>
+            </g>
+            <path class="lmk-tip" d="M30.5 9.4 L27.3 20.9 L18.7 11.1 Z" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/>
+            <path class="lmk-chk" d="M23.5 33 l6 6.2 l12.5 -14.4" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <div>
+            <h1 class="hello" id="hello">Hello</h1>
+            <p class="date" id="date"></p>
+          </div>
         </div>
         <div class="hbtns">
           <button class="odue" id="overduePill" title="Jump to overdue" hidden>⚠ <span id="odueN">0</span></button>
@@ -572,7 +596,28 @@
   </div>
 
   <!-- NAV -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+    <linearGradient id="lm0" gradientUnits="userSpaceOnUse" x1="41.5" y1="15.55" x2="50.99" y2="32.66"><stop offset="0" stop-color="#FB923C"/><stop offset="1" stop-color="#F76A2A"/></linearGradient>
+    <linearGradient id="lm1" gradientUnits="userSpaceOnUse" x1="50.99" y1="32.66" x2="40.33" y2="49.08"><stop offset="0" stop-color="#F76A2A"/><stop offset="1" stop-color="#EE4F28"/></linearGradient>
+    <linearGradient id="lm2" gradientUnits="userSpaceOnUse" x1="40.33" y1="49.08" x2="20.83" y2="47.37"><stop offset="0" stop-color="#EE4F28"/><stop offset="1" stop-color="#D62F23"/></linearGradient>
+    <linearGradient id="lm3" gradientUnits="userSpaceOnUse" x1="20.83" y1="47.37" x2="13.18" y2="29.36"><stop offset="0" stop-color="#D62F23"/><stop offset="1" stop-color="#AE1A1E"/></linearGradient>
+    <linearGradient id="lm4" gradientUnits="userSpaceOnUse" x1="13.18" y1="29.36" x2="25.49" y2="14.14"><stop offset="0" stop-color="#AE1A1E"/><stop offset="1" stop-color="#8A1220"/></linearGradient>
+  </defs></svg>
   <nav class="nav">
+    <div class="brand" aria-hidden="true">
+      <svg class="lmk" viewBox="6 5 52 52">
+        <g fill="none" stroke-width="5" stroke-linecap="round">
+          <path d="M41.5 15.55 A19 19 0 0 1 50.99 32.66" stroke="url(#lm0)"/>
+          <path d="M50.99 32.66 A19 19 0 0 1 40.33 49.08" stroke="url(#lm1)"/>
+          <path d="M40.33 49.08 A19 19 0 0 1 20.83 47.37" stroke="url(#lm2)"/>
+          <path d="M20.83 47.37 A19 19 0 0 1 13.18 29.36" stroke="url(#lm3)"/>
+          <path d="M13.18 29.36 A19 19 0 0 1 25.49 14.14" stroke="url(#lm4)"/>
+        </g>
+        <path class="lmk-tip" d="M30.5 9.4 L27.3 20.9 L18.7 11.1 Z" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/>
+        <path class="lmk-chk" d="M23.5 33 l6 6.2 l12.5 -14.4" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span>dailies</span>
+    </div>
     <button class="on" data-nav="today"><span class="ico">✓</span>Today</button>
     <button data-nav="shopping"><span class="ico">🛒</span>Shopping</button>
     <button data-nav="recurring"><span class="ico">↻</span>Recurring</button>
@@ -606,9 +651,12 @@ let freshInstall=false;                // set in load() when there's no prior da
    "What's New" pop-up shows only the entries newer than the
    version this device last saw (see maybeWhatsNew).
    ============================================================ */
-const APP_VERSION=26;   // ⇄ sw.js cache "daybreak-v26"
+const APP_VERSION=27;   // ⇄ sw.js cache "daybreak-v27"
 const LASTSEEN_LS="daybreak_lastSeenVer";
 const PATCH_NOTES=[
+  {v:27,date:"2026-09-24",title:"The Dailies logo, front and centre",notes:[
+    "The recurring-loop logo now sits beside your greeting on the Today screen.",
+    "On desktop, the sidebar shows the logo with the “dailies” wordmark up top."]},
   {v:26,date:"2026-09-24",title:"Say hello to Dailies",notes:[
     "Daybreak is now Dailies — same app, all your lists and data intact, with a fresh name and a warm new look.",
     "A brand-new app icon plus a redesigned warm colour theme across both light and dark modes."]},
