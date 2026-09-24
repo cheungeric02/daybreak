@@ -364,13 +364,13 @@
       padding:26px 16px;gap:5px;box-shadow:none;background:var(--surface);
     }
     .nav .brand{
-      display:flex;align-items:center;gap:9px;
+      display:flex;align-items:center;gap:10px;
       padding:2px 10px 22px;white-space:nowrap;
     }
-    .nav .brand .lmk{width:28px;height:28px;flex:none}
+    .nav .brand .lmk{width:36px;height:36px;flex:none}
     .nav .brand span{
       font-family:var(--font-display);font-weight:800;
-      font-size:22px;letter-spacing:-.02em;color:var(--ink);text-transform:lowercase;
+      font-size:23px;line-height:1;letter-spacing:-.02em;color:var(--ink);text-transform:lowercase;
     }
     .nav button{
       flex-direction:row;justify-content:flex-start;align-items:center;gap:14px;
@@ -651,12 +651,12 @@ let freshInstall=false;                // set in load() when there's no prior da
    "What's New" pop-up shows only the entries newer than the
    version this device last saw (see maybeWhatsNew).
    ============================================================ */
-const APP_VERSION=27;   // ⇄ sw.js cache "daybreak-v27"
+const APP_VERSION=28;   // ⇄ sw.js cache "daybreak-v28"
 const LASTSEEN_LS="daybreak_lastSeenVer";
 const PATCH_NOTES=[
-  {v:27,date:"2026-09-24",title:"The Dailies logo, front and centre",notes:[
+  {v:28,date:"2026-09-24",title:"The Dailies logo, front and centre",notes:[
     "The recurring-loop logo now sits beside your greeting on the Today screen.",
-    "On desktop, the sidebar shows the logo with the “dailies” wordmark up top."]},
+    "On desktop, the sidebar shows the logo with the “dailies” wordmark up top, nicely aligned."]},
   {v:26,date:"2026-09-24",title:"Say hello to Dailies",notes:[
     "Daybreak is now Dailies — same app, all your lists and data intact, with a fresh name and a warm new look.",
     "A brand-new app icon plus a redesigned warm colour theme across both light and dark modes."]},
